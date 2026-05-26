@@ -5,6 +5,7 @@ import { pickTodaySermon } from "@/lib/today-pick";
 import { AppShell } from "@/components/app-shell";
 import { PageShell } from "@/components/page-layout";
 import { PageHeader } from "@/components/page-header";
+import { PwaInstallCard } from "@/components/pwa-install-card";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,8 @@ export default async function HomePage() {
               </span>
             </div>
           </Link>
+
+          <PwaInstallCard />
         </div>
       </PageShell>
     </AppShell>
