@@ -7,8 +7,8 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, subtitle }: PageHeaderProps) {
   return (
-    <header className="mb-4 flex min-h-11 w-full items-center justify-between gap-3">
-      <div className="min-w-0 flex-1 translate-y-1">
+    <header className="mb-4 flex w-full items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
         {title ? (
           <h1 className="text-xl font-bold leading-tight text-foreground">
             {title}
@@ -20,7 +20,10 @@ export function PageHeader({ title, subtitle }: PageHeaderProps) {
           <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
         ) : null}
       </div>
-      <HomeLink />
+      {/* 서브 페이지 PageTopBar와 동일: h-11 우측 고정 */}
+      <div className="flex h-11 shrink-0 items-center justify-center">
+        <HomeLink />
+      </div>
     </header>
   );
 }
