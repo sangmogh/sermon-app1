@@ -339,6 +339,26 @@ export function buildYoutubeDeepLink(
   return base;
 }
 
+export function buildYoutubeEmbedUrl(
+  videoId: string,
+  seconds: number,
+): string | null {
+  const id = String(videoId ?? "").trim();
+  if (!id) {
+    return null;
+  }
+
+  const start = Math.max(0, Math.floor(Number(seconds) || 0));
+  const params = new URLSearchParams({
+    start: String(start),
+    autoplay: "1",
+    rel: "0",
+    modestbranding: "1",
+  });
+
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?${params.toString()}`;
+}
+
 export function normalizeSermon(raw: Record<string, unknown>): NormalizedSermon {
   const createdAt =
     typeof raw.created_at === "string" && raw.created_at.trim()

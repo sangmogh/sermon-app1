@@ -3,10 +3,7 @@
 import { Quote } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { YoutubeListenLink } from "@/components/youtube-listen-link";
-import {
-  buildYoutubeDeepLink,
-  type NormalizedGraceNote,
-} from "@/lib/sermon-parse";
+import { type NormalizedGraceNote } from "@/lib/sermon-parse";
 
 function GraceNoteCard({
   note,
@@ -15,7 +12,7 @@ function GraceNoteCard({
   note: NormalizedGraceNote;
   videoId: string;
 }) {
-  const youtubeHref = buildYoutubeDeepLink(videoId, note.start_seconds);
+  const hasVideo = Boolean(videoId.trim());
   const timeLabel = note.start_time || "00:00";
 
   return (
@@ -28,15 +25,14 @@ function GraceNoteCard({
       <p className="pl-10 pr-2 text-sm leading-relaxed text-gray-800">
         {note.quote}
       </p>
-      {youtubeHref ? (
-        <div className="mt-5 flex justify-end">
-          <YoutubeListenLink
-            href={youtubeHref}
-            timeLabel={timeLabel}
-            className="inline-flex rounded-full bg-indigo-100 px-3.5 py-1.5 text-xs font-semibold text-indigo-800 transition-colors hover:bg-indigo-200/90 active:scale-95"
-            ariaLabel={`${timeLabel}부터 유튜브에서 듣기`}
-          />
-        </div>
+      {hasVideo ? (
+        <YoutubeListenLink
+          videoId={videoId}
+          startSeconds={note.start_seconds}
+          timeLabel={timeLabel}
+          className="inline-flex rounded-full bg-indigo-100 px-3.5 py-1.5 text-xs font-semibold text-indigo-800 transition-colors hover:bg-indigo-200/90 active:scale-95"
+          ariaLabel={`${timeLabel}부터 유튜브에서 듣기`}
+        />
       ) : null}
     </blockquote>
   );

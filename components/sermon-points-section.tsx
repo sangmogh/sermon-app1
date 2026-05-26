@@ -3,10 +3,7 @@
 import { ListOrdered } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { YoutubeListenLink } from "@/components/youtube-listen-link";
-import {
-  buildYoutubeDeepLink,
-  type NormalizedSermonPoint,
-} from "@/lib/sermon-parse";
+import { type NormalizedSermonPoint } from "@/lib/sermon-parse";
 
 function SermonPointCard({
   point,
@@ -15,7 +12,7 @@ function SermonPointCard({
   point: NormalizedSermonPoint;
   videoId: string;
 }) {
-  const youtubeHref = buildYoutubeDeepLink(videoId, point.start_seconds);
+  const hasVideo = Boolean(videoId.trim());
   const timeLabel = point.start_time || "00:00";
 
   return (
@@ -31,15 +28,14 @@ function SermonPointCard({
       <p className="mt-2 pl-10 pr-2 text-sm leading-relaxed text-gray-800">
         {point.description}
       </p>
-      {youtubeHref ? (
-        <div className="mt-5 flex justify-end">
-          <YoutubeListenLink
-            href={youtubeHref}
-            timeLabel={timeLabel}
-            className="inline-flex rounded-full bg-rose-100 px-3.5 py-1.5 text-xs font-semibold text-rose-900 transition-colors hover:bg-rose-200/90 active:scale-95"
-            ariaLabel={`${point.point_title} — ${timeLabel}부터 유튜브에서 듣기`}
-          />
-        </div>
+      {hasVideo ? (
+        <YoutubeListenLink
+          videoId={videoId}
+          startSeconds={point.start_seconds}
+          timeLabel={timeLabel}
+          className="inline-flex rounded-full bg-rose-100 px-3.5 py-1.5 text-xs font-semibold text-rose-900 transition-colors hover:bg-rose-200/90 active:scale-95"
+          ariaLabel={`${point.point_title} — ${timeLabel}부터 유튜브에서 듣기`}
+        />
       ) : null}
     </blockquote>
   );

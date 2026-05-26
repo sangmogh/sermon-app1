@@ -3,10 +3,7 @@
 import { HeartHandshake } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
 import { YoutubeListenLink } from "@/components/youtube-listen-link";
-import {
-  buildYoutubeDeepLink,
-  type NormalizedDecisionPrayer,
-} from "@/lib/sermon-parse";
+import { type NormalizedDecisionPrayer } from "@/lib/sermon-parse";
 
 type DecisionPrayerSectionProps = {
   prayer: NormalizedDecisionPrayer | null;
@@ -18,9 +15,7 @@ export function DecisionPrayerSection({
   videoId,
 }: DecisionPrayerSectionProps) {
   const hasPrayer = prayer !== null && prayer.prayer_text.trim().length > 0;
-  const youtubeHref = prayer
-    ? buildYoutubeDeepLink(videoId, prayer.start_seconds)
-    : null;
+  const hasVideo = Boolean(videoId.trim());
   const timeLabel = prayer?.start_time || "00:00";
 
   return (
@@ -46,15 +41,14 @@ export function DecisionPrayerSection({
           <p className="whitespace-pre-line text-sm leading-relaxed text-gray-800">
             {prayer.prayer_text}
           </p>
-          {youtubeHref ? (
-            <div className="mt-5 flex justify-end">
-              <YoutubeListenLink
-                href={youtubeHref}
-                timeLabel={timeLabel}
-                className="inline-flex rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/90 active:scale-95"
-                ariaLabel={`결단의 기도 ${timeLabel}부터 유튜브에서 듣기`}
-              />
-            </div>
+          {hasVideo ? (
+            <YoutubeListenLink
+              videoId={videoId}
+              startSeconds={prayer.start_seconds}
+              timeLabel={timeLabel}
+              className="inline-flex rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/90 active:scale-95"
+              ariaLabel={`결단의 기도 ${timeLabel}부터 유튜브에서 듣기`}
+            />
           ) : null}
         </div>
       ) : (
