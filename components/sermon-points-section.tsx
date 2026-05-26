@@ -27,7 +27,7 @@ function SermonPointCard({
       <h4 className="pl-10 pr-2 text-base font-semibold leading-snug text-gray-900">
         {point.point_title}
       </h4>
-      <p className="mt-2 pl-10 pr-2 text-[15px] leading-relaxed text-gray-800">
+      <p className="mt-2 pl-10 pr-2 text-sm leading-relaxed text-gray-800">
         {point.description}
       </p>
       {youtubeHref ? (

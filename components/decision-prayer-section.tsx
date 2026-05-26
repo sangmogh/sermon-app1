@@ -41,7 +41,7 @@ export function DecisionPrayerSection({
     >
       {hasPrayer && prayer ? (
         <div className="rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-amber-100/80">
-          <p className="whitespace-pre-line text-[15px] leading-relaxed text-gray-800">
+          <p className="whitespace-pre-line text-sm leading-relaxed text-gray-800">
             {prayer.prayer_text}
           </p>
           {youtubeHref ? (

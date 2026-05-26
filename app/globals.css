@@ -28,6 +28,22 @@
   --color-border: var(--border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* 모바일 가독성: text-* 유틸 한 단계 상향 */
+  --text-xs: 0.875rem;
+  --text-xs--line-height: calc(1.25 / 0.875);
+  --text-sm: 1rem;
+  --text-sm--line-height: calc(1.5 / 1);
+  --text-base: 1.125rem;
+  --text-base--line-height: calc(1.75 / 1.125);
+  --text-lg: 1.25rem;
+  --text-lg--line-height: calc(1.75 / 1.25);
+  --text-xl: 1.5rem;
+  --text-xl--line-height: calc(2 / 1.5);
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: calc(2.25 / 1.875);
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: calc(2.5 / 2.25);
 }
 
 body {

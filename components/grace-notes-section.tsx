@@ -24,7 +24,7 @@ function GraceNoteCard({
         strokeWidth={1.5}
         aria-hidden
       />
-      <p className="pl-10 pr-2 text-[15px] leading-relaxed text-gray-800">
+      <p className="pl-10 pr-2 text-sm leading-relaxed text-gray-800">
         {note.quote}
       </p>
       {youtubeHref ? (
