@@ -7,6 +7,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#818cf8",
 };
 
 const geistSans = Geist({
@@ -26,6 +27,18 @@ export const metadata: Metadata = {
     capable: true,
     title: "오늘의 말씀",
     statusBarStyle: "default",
+    startupImage: [
+      {
+        url: "/icons/apple-splash-1170x2532.png",
+        media:
+          "(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+      {
+        url: "/icons/apple-splash-1284x2778.png",
+        media:
+          "(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)",
+      },
+    ],
   },
   icons: {
     icon: [
