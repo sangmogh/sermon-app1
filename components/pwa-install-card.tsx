@@ -68,7 +68,7 @@ export function PwaInstallCard() {
         onClick={() => void handleClick()}
         className="relative block h-fit w-full rounded-3xl bg-gradient-to-br from-orange-50 to-amber-100 p-6 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]"
       >
-        <div className="absolute right-6 top-6 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+        <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
           <Smartphone className="size-6 text-orange-500" strokeWidth={2} />
         </div>
 
