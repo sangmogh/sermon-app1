@@ -22,8 +22,8 @@ export default async function ArchiveYearPickerPage() {
   const years = collectArchiveYears((data ?? []) as Sermon[]);
 
   return (
-    <AppShell>
-      <PageShell>
+    <AppShell wide>
+      <PageShell className="!px-4 sm:!px-5">
         <SubPageHeader
           title="설교 보관함"
           subtitle="연도를 선택해 지난 말씀을 만나보세요"
@@ -36,17 +36,17 @@ export default async function ArchiveYearPickerPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 pb-6">
+          <div className="grid w-full grid-cols-2 gap-4 pb-6">
             {years.map((year) => (
               <Link
                 key={year}
                 href={`/archive/${year}`}
-                className="flex aspect-[5/4] flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100 p-4 text-center shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
+                className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-emerald-50 to-teal-100 p-5 text-center shadow-sm transition-all hover:shadow-md active:scale-[0.98]"
               >
-                <div className="flex size-11 items-center justify-center rounded-xl bg-white/80 shadow-sm">
-                  <CalendarDays className="size-6 text-emerald-600" />
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+                  <CalendarDays className="size-7 text-emerald-600" strokeWidth={2} />
                 </div>
-                <span className="text-lg font-bold text-foreground">
+                <span className="text-xl font-bold tracking-tight text-foreground">
                   {year}년
                 </span>
               </Link>
