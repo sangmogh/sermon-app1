@@ -8,7 +8,7 @@ import Link from "next/link";
 
 import { useSearchParams } from "next/navigation";
 
-import { Search, Inbox } from "lucide-react";
+import { Inbox } from "lucide-react";
 
 import { SearchResultsSkeleton } from "@/components/skeleton";
 
@@ -222,20 +222,9 @@ export function SearchClient({ topKeywords, allKeywords }: SearchClientProps) {
 
     <div className="flex flex-col pb-6">
 
-      <div
-        className="pointer-events-none flex cursor-default select-none items-center gap-3 rounded-2xl bg-card px-5 py-4 shadow-sm"
-      >
-        <Search className="size-5 shrink-0 text-muted-foreground" />
-        <span className="flex-1 text-sm text-muted-foreground">
-          키워드를 눌러보세요
-        </span>
-      </div>
-
-
-
       {topKeywords.length > 0 ? (
 
-        <section className="mt-4 rounded-2xl bg-card p-4 shadow-sm">
+        <section className="rounded-2xl bg-card p-4 shadow-sm">
 
           <h3 className="text-sm font-semibold text-foreground">인기 키워드</h3>
 

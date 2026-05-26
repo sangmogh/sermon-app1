@@ -1,7 +1,8 @@
 "use client";
 
-import { ListOrdered, Play } from "lucide-react";
+import { ListOrdered } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
+import { YoutubeListenLink } from "@/components/youtube-listen-link";
 import {
   buildYoutubeDeepLink,
   type NormalizedSermonPoint,
@@ -15,7 +16,7 @@ function SermonPointCard({
   videoId: string;
 }) {
   const youtubeHref = buildYoutubeDeepLink(videoId, point.start_seconds);
-  const timeLabel = point.start_time || "듣기";
+  const timeLabel = point.start_time || "00:00";
 
   return (
     <blockquote className="relative overflow-hidden rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-rose-100/80">
@@ -32,16 +33,12 @@ function SermonPointCard({
       </p>
       {youtubeHref ? (
         <div className="mt-5 flex justify-end">
-          <a
+          <YoutubeListenLink
             href={youtubeHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3.5 py-1.5 text-xs font-semibold text-rose-900 transition-colors hover:bg-rose-200/90 active:scale-95"
-            aria-label={`${point.point_title} — ${timeLabel}부터 유튜브에서 듣기`}
-          >
-            <Play className="size-3.5 shrink-0" fill="currentColor" />
-            {timeLabel}
-          </a>
+            timeLabel={timeLabel}
+            className="inline-flex rounded-full bg-rose-100 px-3.5 py-1.5 text-xs font-semibold text-rose-900 transition-colors hover:bg-rose-200/90 active:scale-95"
+            ariaLabel={`${point.point_title} — ${timeLabel}부터 유튜브에서 듣기`}
+          />
         </div>
       ) : null}
     </blockquote>
@@ -58,6 +55,7 @@ export function SermonPointsSection({ points, videoId }: SermonPointsSectionProp
 
   return (
     <CollapsibleSection
+      alwaysOpen
       title="설교 포인트"
       icon={
         <ListOrdered

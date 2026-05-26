@@ -1,7 +1,8 @@
 "use client";
 
-import { HeartHandshake, Play } from "lucide-react";
+import { HeartHandshake } from "lucide-react";
 import { CollapsibleSection } from "@/components/collapsible-section";
+import { YoutubeListenLink } from "@/components/youtube-listen-link";
 import {
   buildYoutubeDeepLink,
   type NormalizedDecisionPrayer,
@@ -20,10 +21,11 @@ export function DecisionPrayerSection({
   const youtubeHref = prayer
     ? buildYoutubeDeepLink(videoId, prayer.start_seconds)
     : null;
-  const timeLabel = prayer?.start_time || "듣기";
+  const timeLabel = prayer?.start_time || "00:00";
 
   return (
     <CollapsibleSection
+      alwaysOpen
       title="결단의 기도"
       icon={
         <HeartHandshake
@@ -46,16 +48,12 @@ export function DecisionPrayerSection({
           </p>
           {youtubeHref ? (
             <div className="mt-5 flex justify-end">
-              <a
+              <YoutubeListenLink
                 href={youtubeHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/90 active:scale-95"
-                aria-label={`결단의 기도 ${timeLabel}부터 유튜브에서 듣기`}
-              >
-                <Play className="size-3.5 shrink-0" fill="currentColor" />
-                {timeLabel}부터 듣기
-              </a>
+                timeLabel={timeLabel}
+                className="inline-flex rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-200/90 active:scale-95"
+                ariaLabel={`결단의 기도 ${timeLabel}부터 유튜브에서 듣기`}
+              />
             </div>
           ) : null}
         </div>
