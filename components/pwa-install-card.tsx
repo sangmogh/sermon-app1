@@ -137,7 +137,7 @@ export function PwaInstallCard() {
         <div className="flex flex-col items-start pr-14">
           <h2 className="text-lg font-bold text-foreground">홈 화면에 추가</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            Chrome, Safari에서만 눌러주세요
+            Chrome, Safari에서 눌러주세요
           </p>
         </div>
       </button>
