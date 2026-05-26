@@ -19,7 +19,7 @@ export default function SermonDetailError({
   return (
     <AppShell>
       <PageShell>
-        <SubPageHeader title="오늘의 말씀" />
+        <SubPageHeader showTitle={false} />
         <div className="rounded-3xl bg-card px-6 py-12 text-center shadow-sm">
           <p className="text-base font-semibold text-foreground">
             설교를 불러오지 못했어요

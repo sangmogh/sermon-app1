@@ -8,7 +8,7 @@ export default function SermonDetailLoading() {
     <AppShell>
       <PageScrollShell>
         <PageStickyHeader>
-          <SubPageHeader title="오늘의 말씀" />
+          <SubPageHeader showTitle={false} />
         </PageStickyHeader>
         <SermonDetailSkeleton />
       </PageScrollShell>

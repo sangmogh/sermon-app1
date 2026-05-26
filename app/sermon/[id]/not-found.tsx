@@ -8,7 +8,7 @@ export default function SermonNotFound() {
   return (
     <AppShell>
       <PageShell>
-        <SubPageHeader title="오늘의 말씀" />
+        <SubPageHeader showTitle={false} />
         <div className="rounded-3xl bg-card px-6 py-12 text-center shadow-sm">
           <div className="flex size-16 items-center justify-center rounded-2xl bg-muted">
             <FileQuestion className="size-8 text-muted-foreground" />

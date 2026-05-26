@@ -55,7 +55,7 @@ export default async function SermonDetailPage({
     <AppShell>
       <PageScrollShell>
         <PageStickyHeader>
-          <SubPageHeader title="오늘의 말씀" />
+          <SubPageHeader showTitle={false} />
         </PageStickyHeader>
 
         <div className="flex flex-col gap-4 pb-6">
