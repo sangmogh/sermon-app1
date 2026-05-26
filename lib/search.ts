@@ -1,0 +1,153 @@
+import { createBrowserSupabase } from "@/lib/supabase-browser";
+import { formatSermonDateLabel, sortSermonsBySermonDate } from "@/lib/archive";
+import { parseKeywords } from "@/lib/sermon-parse";
+import type { Sermon } from "@/lib/supabase";
+
+export type SearchResultSermon = {
+  id: string;
+  title: string;
+  core_bible_verse: string;
+  keywords: string[];
+  sermon_date?: string | null;
+};
+
+export const POPULAR_TAGS = ["위로", "결단", "가족", "사명", "믿음"] as const;
+
+const SERMON_SELECT =
+  "id, title, core_bible_verse, keywords, sermon_date, created_at";
+
+/** PostgREST ilike 와일드카드 이스케이프 */
+export function escapeIlikePattern(value: string): string {
+  return value.replace(/[%_\\]/g, (char) => `\\${char}`);
+}
+
+function normalizeRow(row: Record<string, unknown>): SearchResultSermon {
+  const sermonDate = row.sermon_date;
+  return {
+    id: String(row.id ?? ""),
+    title: String(row.title ?? "제목 없음"),
+    core_bible_verse: String(row.core_bible_verse ?? ""),
+    keywords: parseKeywords(row.keywords),
+    sermon_date:
+      typeof sermonDate === "string"
+        ? sermonDate
+        : sermonDate === null
+          ? null
+          : undefined,
+  };
+}
+
+function rowToSermon(row: SearchResultSermon): Sermon {
+  return {
+    id: row.id,
+    title: row.title,
+    core_bible_verse: row.core_bible_verse,
+    keywords: row.keywords,
+    summary: "",
+    points: [],
+    sermon_date: row.sermon_date ?? null,
+    created_at: "",
+  };
+}
+
+function mergeUniqueResults(
+  lists: SearchResultSermon[][],
+): SearchResultSermon[] {
+  const map = new Map<string, SearchResultSermon>();
+  for (const list of lists) {
+    for (const item of list) {
+      if (item.id) {
+        map.set(item.id, item);
+      }
+    }
+  }
+
+  const asSermons = Array.from(map.values()).map(rowToSermon);
+  const sorted = sortSermonsBySermonDate(asSermons);
+
+  return sorted.map((sermon) => ({
+    id: sermon.id,
+    title: sermon.title,
+    core_bible_verse: sermon.core_bible_verse,
+    keywords: sermon.keywords,
+    sermon_date: sermon.sermon_date,
+  }));
+}
+
+/**
+ * title ilike + keywords(jsonb) 부분 일치 검색
+ */
+export async function searchSermons(
+  query: string,
+): Promise<SearchResultSermon[]> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const supabase = createBrowserSupabase();
+  const pattern = `%${escapeIlikePattern(trimmed)}%`;
+  const tag = trimmed.replace(/^#/, "");
+
+  const { data: titleMatches, error: titleError } = await supabase
+    .from("sermons")
+    .select(SERMON_SELECT)
+    .ilike("title", pattern);
+
+  if (titleError) {
+    throw new Error(titleError.message);
+  }
+
+  const titleResults = (titleMatches ?? []).map((row) =>
+    normalizeRow(row as Record<string, unknown>),
+  );
+
+  const { data: keywordTextMatches, error: keywordTextError } = await supabase
+    .from("sermons")
+    .select(SERMON_SELECT)
+    .ilike("keywords", pattern);
+
+  let keywordResults: SearchResultSermon[] = [];
+
+  if (!keywordTextError && keywordTextMatches) {
+    keywordResults = keywordTextMatches.map((row) =>
+      normalizeRow(row as Record<string, unknown>),
+    );
+  } else {
+    const { data: allSermons, error: allError } = await supabase
+      .from("sermons")
+      .select(SERMON_SELECT);
+
+    if (allError) {
+      throw new Error(allError.message);
+    }
+
+    const lower = trimmed.toLowerCase();
+    keywordResults = (allSermons ?? [])
+      .map((row) => normalizeRow(row as Record<string, unknown>))
+      .filter((sermon) =>
+        sermon.keywords.some((keyword) =>
+          keyword.toLowerCase().includes(lower),
+        ),
+      );
+  }
+
+  const { data: exactTagMatches, error: tagError } = await supabase
+    .from("sermons")
+    .select(SERMON_SELECT)
+    .contains("keywords", [tag]);
+
+  if (tagError) {
+    return mergeUniqueResults([titleResults, keywordResults]);
+  }
+
+  const tagResults = (exactTagMatches ?? []).map((row) =>
+    normalizeRow(row as Record<string, unknown>),
+  );
+
+  return mergeUniqueResults([titleResults, keywordResults, tagResults]);
+}
+
+export function formatSearchResultDate(sermon: SearchResultSermon): string {
+  return formatSermonDateLabel(rowToSermon(sermon));
+}

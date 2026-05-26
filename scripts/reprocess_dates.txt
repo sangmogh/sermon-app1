@@ -1,0 +1,16 @@
+# 재분석 대상 sermon_date (YYYYMMDD 또는 YYYY-MM-DD)
+# 사용: python scripts/delete_output_for_reprocess.py --dates-file scripts/reprocess_dates.txt --delete
+
+20260517
+20260412
+20260308
+20260101
+20251214
+20250824
+20250727
+20250427
+20250413
+20250406
+20250209
+20250126
+20240519

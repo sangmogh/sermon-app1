@@ -1,0 +1,10 @@
+# AI 분석 (analyze_sermon.py) — 키는 루트 .env 의 GEMINI_API_KEY
+google-genai
+# 자막 추출
+youtube-transcript-api
+# YouTube 메타/오디오 (fix_dates, bulk_processors, audio_downloader)
+yt-dlp
+# 환경변수 (.env.local + .env)
+python-dotenv
+# Supabase REST (fix_dates.py, upload_to_db.py) — 키는 .env.local
+requests
