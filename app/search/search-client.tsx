@@ -232,13 +232,13 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
           </button>
         </div>
         <div className="mt-3 rounded-2xl border border-border/60 border-l-2 border-l-slate-500/40 bg-muted/40 px-3.5 py-3 text-foreground/90">
-          <p className="text-[15px] font-semibold leading-relaxed text-foreground">
+          <p className="text-[16px] font-semibold leading-relaxed text-foreground">
             고민이나 상황을 적으면 설교를 찾아드려요
           </p>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/90">
+          <p className="mt-1.5 text-[14px] leading-relaxed text-foreground/90">
             예: 구원의 확신이 없어요 · 믿음을 키우는 법
           </p>
-          <p className="pl-[1.125rem] text-[13px] leading-relaxed text-foreground/90">
+          <p className="pl-[1.125rem] text-[14px] leading-relaxed text-foreground/90">
             어떻게 살아가야 할까요 · 기도 응답이 안 와요
           </p>
         </div>
