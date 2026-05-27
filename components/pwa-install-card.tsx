@@ -110,7 +110,7 @@ function InstallCardActionRow({
     );
 
   return (
-    <div className="mt-3 flex items-end justify-between gap-3">
+    <div className="mt-3 flex min-h-11 w-full items-end justify-between gap-3">
       <p className="min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
         {subtitle}
       </p>
@@ -138,7 +138,7 @@ function InstallCardShell({
       <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
         <Icon className="size-6 text-orange-500" strokeWidth={2} />
       </div>
-      <div className="flex flex-col items-start pr-14">{children}</div>
+      <div className="flex w-full flex-col items-stretch pr-14">{children}</div>
     </>
   );
 
