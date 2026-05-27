@@ -133,14 +133,14 @@ export function isExcludedFromSearchPopularKeywords(keyword: string): boolean {
 /** 검색 화면 인기 키워드 — 항상 노출할 태그 */
 export const PINNED_SEARCH_KEYWORDS = [
   "믿음",
-  "결단",
   "사랑",
   "감사",
   "두려움",
 ] as const;
 
 const GOD_PREFIXES = ["하나님의 ", "하나님 "];
-const FALLBACK_GOD_KEYWORD = "하나님 나라";
+const TOP_KEYWORD_POOL_SIZE = 25;
+const RANDOM_FILLER_COUNT = 5;
 
 function isGodKeyword(keyword: string): boolean {
   const k = keyword.trim();
@@ -198,8 +198,9 @@ function seoulDaySeed(now = new Date()): string {
 }
 
 /**
- * 검색 인기 키워드: 고정 태그 + DB 빈도 상위(하나님* 제외, 하나님의 심판은 고정).
- * @param limit 전체 노출 개수 (기본 22)
+ * 검색 인기 키워드 (KST 일 단위):
+ * - 고정 4 + 하나님* 0~1 + 상위 25에서 랜덤 5 (하나님 0이면 랜덤 6 → 항상 10개)
+ * - UI 표시 순서도 매일 랜덤
  */
 export function computeSearchPopularKeywords(
   rows: { keywords: unknown }[],
@@ -217,28 +218,37 @@ export function computeSearchPopularKeywords(
     .filter(([keyword, count]) => isGodKeyword(keyword) && count > 0)
     .map(([keyword]) => keyword)
     .sort((a, b) => a.localeCompare(b, "ko-KR"));
-  const selectedGod =
-    pickRandomByDay(godCandidates, `${daySeed}:god`) ?? FALLBACK_GOD_KEYWORD;
+  const includeGod =
+    godCandidates.length > 0 && hashString(`${daySeed}:god-on`) % 2 === 0;
+  const selectedGod = includeGod
+    ? pickRandomByDay(godCandidates, `${daySeed}:god-pick`)
+    : null;
 
-  const top20 = Array.from(counts.entries())
+  const top25 = Array.from(counts.entries())
     .map(([keyword, count]) => ({ keyword, count }))
     .sort((a, b) => b.count - a.count || a.keyword.localeCompare(b.keyword, "ko-KR"))
-    .slice(0, 20);
-  const randomPool = top20.filter(
+    .slice(0, TOP_KEYWORD_POOL_SIZE);
+  const randomPool = top25.filter(
     ({ keyword }) =>
       !fixedSet.has(keyword) &&
       keyword !== selectedGod &&
       !isExcludedFromSearchPopularKeywords(keyword),
   );
-  const random4 = pickManyRandomByDay(randomPool, 4, `${daySeed}:top20`);
+  const fillerCount = selectedGod ? RANDOM_FILLER_COUNT : RANDOM_FILLER_COUNT + 1;
+  const randomFillers = pickManyRandomByDay(
+    randomPool,
+    fillerCount,
+    `${daySeed}:top25`,
+  );
 
-  const merged = [
-    ...fixed,
-    { keyword: selectedGod, count: counts.get(selectedGod) ?? 0 },
-    ...random4,
-  ];
+  const merged: KeywordStat[] = [...fixed];
+  if (selectedGod) {
+    merged.push({ keyword: selectedGod, count: counts.get(selectedGod) ?? 0 });
+  }
+  merged.push(...randomFillers);
 
-  return merged.slice(0, limit);
+  const shuffled = pickManyRandomByDay(merged, merged.length, `${daySeed}:order`);
+  return shuffled.slice(0, limit);
 }
 
 /** 설교 keywords 배열을 모아 빈도순 상위 키워드 반환 */
