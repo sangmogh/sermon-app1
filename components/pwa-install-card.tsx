@@ -231,10 +231,6 @@ export function PwaInstallCard() {
     return null;
   }
 
-  if (platform === "other" && mode === "install-hint") {
-    return null;
-  }
-
   const androidIntentUrl = pageUrl ? buildAndroidChromeIntentUrl(pageUrl) : "#";
 
   const feedbackLine = feedback ? (
@@ -291,12 +287,19 @@ export function PwaInstallCard() {
 
   return (
     <div className="w-full">
-      <InstallCardShell icon={Smartphone}>
-        <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+      <InstallCardShell
+        icon={Smartphone}
+        asButton
+        onCardClick={() => void handleInstallClick()}
+      >
+        <h2 className="text-lg font-bold text-foreground">홈 화면에 추가</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Chrome 또는 Safari에서 열어주세요
+          {deferredPrompt
+            ? "아래를 눌러 바로 추가할 수 있어요"
+            : "Chrome 또는 Safari에서 눌러주세요"}
         </p>
       </InstallCardShell>
+      {feedbackLine}
     </div>
   );
 }
