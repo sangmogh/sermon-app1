@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Download, ExternalLink, Share, Smartphone } from "lucide-react";
 import {
   buildAndroidChromeIntentUrl,
+  copyPageUrl,
   getExternalBrowserTarget,
   isAndroid,
   isChromeBrowser,
   isInAppBrowser,
   isIOS,
+  isKakaoTalk,
   isSafariBrowser,
+  needsIosInAppManualBrowser,
   openInSafari,
 } from "@/lib/open-external-browser";
 
@@ -73,30 +76,39 @@ function getInstallHint(platform: DevicePlatform): string {
   return "휴대폰 Chrome 또는 Safari에서 이 카드를 눌러주세요.";
 }
 
+function IosInAppSafariGuide({ inKakao }: { inKakao: boolean }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3">
+      <ol className="space-y-2 text-xs leading-relaxed text-foreground">
+        <li className="flex gap-2">
+          <span className="font-bold text-orange-600">1</span>
+          <span>
+            화면 <strong>오른쪽 아래 ···</strong>
+            {inKakao ? " (또는 공유 모양)" : ""} 을 눌러주세요
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-bold text-orange-600">2</span>
+          <span>
+            <strong className="text-orange-600">Safari에서 열기</strong>를
+            눌러주세요
+          </span>
+        </li>
+        <li className="flex gap-2">
+          <span className="font-bold text-orange-600">3</span>
+          <span>Safari에서 다시 이 페이지의 설치 안내를 따라주세요</span>
+        </li>
+      </ol>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground">
+        ※ 「열기」만 누르면 카카오 안에서만 다시 열려 설치가 안 됩니다
+      </p>
+    </div>
+  );
+}
+
 function KakaoOpenHint({ platform }: { platform: DevicePlatform }) {
   if (platform === "ios") {
-    return (
-      <div
-        className="mt-3 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3"
-        aria-hidden
-      >
-        <p className="mb-2 text-center text-[11px] text-muted-foreground">
-          이렇게 나오면 <span className="font-semibold text-orange-600">열기</span>
-          를 눌러주세요
-        </p>
-        <div className="flex justify-center gap-1.5">
-          <span className="rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-            바로가기
-          </span>
-          <span className="rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-            둘러보기
-          </span>
-          <span className="rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm">
-            열기
-          </span>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (platform === "android") {
@@ -170,11 +182,16 @@ export function PwaInstallCard() {
   const [mode, setMode] = useState<InstallMode>("install-hint");
   const [platform, setPlatform] = useState<DevicePlatform>("other");
   const [pageUrl, setPageUrl] = useState("");
+  const [inKakao, setInKakao] = useState(false);
+  const [iosManualEscape, setIosManualEscape] = useState(false);
 
   useEffect(() => {
+    const ua = navigator.userAgent;
     setPageUrl(window.location.href);
     setPlatform(detectPlatform());
     setMode(detectInstallMode());
+    setInKakao(isKakaoTalk(ua));
+    setIosManualEscape(needsIosInAppManualBrowser(ua));
 
     const standalone = window.matchMedia(
       "(display-mode: standalone)",
@@ -219,12 +236,25 @@ export function PwaInstallCard() {
   }, [deferredPrompt, platform]);
 
   const handleSafariOpen = useCallback(() => {
-    if (!pageUrl) {
+    if (!pageUrl || iosManualEscape) {
       return;
     }
     openInSafari(pageUrl);
     setFeedback(
       "Safari가 안 열리면 ⋯ 메뉴에서 「Safari에서 열기」 또는 「다른 브라우저로 열기」를 눌러주세요.",
+    );
+    window.setTimeout(() => setFeedback(null), 10000);
+  }, [pageUrl, iosManualEscape]);
+
+  const handleCopyLink = useCallback(async () => {
+    if (!pageUrl) {
+      return;
+    }
+    const ok = await copyPageUrl(pageUrl);
+    setFeedback(
+      ok
+        ? "주소가 복사됐어요. Safari를 연 뒤 주소창에 붙여넣기 해 주세요."
+        : "복사가 안 되면 아래 안내대로 Safari에서 열기를 눌러주세요.",
     );
     window.setTimeout(() => setFeedback(null), 10000);
   }, [pageUrl]);
@@ -248,19 +278,39 @@ export function PwaInstallCard() {
           <div className="flex flex-col items-start pr-14">
             <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              카카오톡에서는 설치가 안 돼요.
-              <br />
-              {platform === "ios"
-                ? "아래를 누른 뒤 열기 버튼을 눌러주세요."
-                : platform === "android"
-                  ? "아래를 누른 뒤 Chrome에서 열기(또는 열기)를 눌러주세요."
-                  : "아래를 누른 뒤 열기 버튼을 눌러주세요."}
+              {iosManualEscape ? (
+                <>
+                  Safari에서 열어야 설치할 수 있어요.
+                  <br />
+                  아래 순서대로 진행해 주세요.
+                </>
+              ) : (
+                <>
+                  {inKakao ? "카카오톡" : "이 앱"} 안에서는 설치가 어려워요.
+                  <br />
+                  {platform === "android"
+                    ? "아래를 누른 뒤 Chrome에서 열기(또는 열기)를 눌러주세요."
+                    : "아래 버튼으로 Safari에서 열어주세요."}
+                </>
+              )}
             </p>
-            <KakaoOpenHint platform={platform} />
+            {iosManualEscape ? (
+              <IosInAppSafariGuide inKakao={inKakao} />
+            ) : (
+              <KakaoOpenHint platform={platform} />
+            )}
           </div>
 
-          <div className="mt-4">
-            {isSafariTarget ? (
+          <div className="mt-4 space-y-2">
+            {iosManualEscape ? (
+              <button
+                type="button"
+                onClick={() => void handleCopyLink()}
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition active:scale-[0.99]"
+              >
+                주소 복사하기
+              </button>
+            ) : isSafariTarget ? (
               <button
                 type="button"
                 onClick={handleSafariOpen}

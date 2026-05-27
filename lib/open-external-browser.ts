@@ -5,6 +5,15 @@ export function isInAppBrowser(userAgent = ""): boolean {
   );
 }
 
+export function isKakaoTalk(userAgent = ""): boolean {
+  return /KAKAOTALK/i.test(userAgent);
+}
+
+/** iOS 인앱(WebView)에서는 window.open 이 Safari로 나가지 않고 같은 앱 안에서만 다시 열림 */
+export function needsIosInAppManualBrowser(userAgent = ""): boolean {
+  return isIOS(userAgent) && isInAppBrowser(userAgent);
+}
+
 export function isIOS(userAgent = ""): boolean {
   return (
     /iPad|iPhone|iPod/i.test(userAgent) ||
@@ -47,10 +56,36 @@ export function getExternalBrowserTarget(
   return null;
 }
 
-/** iOS: 새 창으로 열기 시도 (인앱 브라우저에 따라 Safari로 넘어가는 경우 있음) */
+/** iOS 일반 브라우저(Chrome 등)에서 Safari 유도용 — 카카오 인앱에서는 사용하지 말 것 */
 export function openInSafari(pageUrl: string): void {
   const opened = window.open(pageUrl, "_blank", "noopener,noreferrer");
   if (!opened) {
     window.location.assign(pageUrl);
+  }
+}
+
+export async function copyPageUrl(pageUrl: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(pageUrl);
+      return true;
+    }
+  } catch {
+    // fallback below
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = pageUrl;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
   }
 }
