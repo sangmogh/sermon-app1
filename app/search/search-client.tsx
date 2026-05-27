@@ -228,7 +228,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
           <p className="mt-1.5 text-muted-foreground/80">
             예: 구원의 확신이 없어요 · 믿음을 키우는 법
           </p>
-          <p className="pl-[1.75rem] text-muted-foreground/80">
+          <p className="pl-[1.125rem] text-muted-foreground/80">
             어떻게 살아가야 할까요 · 기도의 응답이 안 와요
           </p>
         </div>
