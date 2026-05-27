@@ -21,7 +21,11 @@ type InstallMode = "open-external" | "install-ready" | "install-hint";
 
 type DevicePlatform = "ios" | "android" | "other";
 
-type AccentChipKind = "open" | "copy" | "download";
+type AccentPillKind = "open" | "copy" | "download";
+
+/** 홈 파란/초록 카드의 바로가기·둘러보기 pill 과 동일 형태 */
+const ORANGE_PILL_CLASS =
+  "shrink-0 inline-flex rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
 
 function detectPlatform(): DevicePlatform {
   if (typeof navigator === "undefined") {
@@ -65,19 +69,14 @@ function getInstallHint(platform: DevicePlatform): string {
   return "휴대폰 Chrome 또는 Safari에서 열어주세요.";
 }
 
-const CHIP_MUTED =
-  "rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground";
-const CHIP_ACCENT =
-  "rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm";
-
-function ChipHintRow({
+function InstallCardActionRow({
   subtitle,
   accentKind,
   accentHref,
   onAccentClick,
 }: {
   subtitle: string;
-  accentKind: AccentChipKind;
+  accentKind: AccentPillKind;
   accentHref?: string;
   onAccentClick?: () => void;
 }) {
@@ -88,11 +87,11 @@ function ChipHintRow({
         ? "주소복사"
         : "다운로드";
 
-  const accentNode =
+  const pill =
     accentHref !== undefined ? (
       <a
         href={accentHref}
-        className={`${CHIP_ACCENT} shrink-0 transition active:scale-[0.98]`}
+        className={ORANGE_PILL_CLASS}
         onClick={(event) => event.stopPropagation()}
       >
         {accentLabel}
@@ -100,7 +99,7 @@ function ChipHintRow({
     ) : (
       <button
         type="button"
-        className={`${CHIP_ACCENT} shrink-0 transition active:scale-[0.98]`}
+        className={ORANGE_PILL_CLASS}
         onClick={(event) => {
           event.stopPropagation();
           onAccentClick?.();
@@ -111,15 +110,11 @@ function ChipHintRow({
     );
 
   return (
-    <div className="mt-2 w-full">
-      <p className="text-sm text-muted-foreground">{subtitle}</p>
-      <div className="mt-2 flex items-end justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5" aria-hidden>
-          <span className={CHIP_MUTED}>바로가기</span>
-          <span className={CHIP_MUTED}>둘러보기</span>
-        </div>
-        {accentNode}
-      </div>
+    <div className="mt-3 flex items-end justify-between gap-3">
+      <p className="min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
+        {subtitle}
+      </p>
+      {pill}
     </div>
   );
 }
@@ -247,13 +242,13 @@ export function PwaInstallCard() {
         <InstallCardShell icon={ExternalLink}>
           <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
           {isIos ? (
-            <ChipHintRow
+            <InstallCardActionRow
               subtitle="safari에서 열어주세요"
               accentKind="copy"
               onAccentClick={() => void handleCopyLink()}
             />
           ) : (
-            <ChipHintRow
+            <InstallCardActionRow
               subtitle="열기 버튼을 눌러주세요"
               accentKind="open"
               accentHref={androidIntentUrl}
@@ -274,7 +269,7 @@ export function PwaInstallCard() {
           onCardClick={() => void handleInstallClick()}
         >
           <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
-          <ChipHintRow
+          <InstallCardActionRow
             subtitle="이제 다운로드할 수 있어요"
             accentKind="download"
             onAccentClick={() => void handleInstallClick()}
@@ -293,7 +288,7 @@ export function PwaInstallCard() {
         onCardClick={() => void handleInstallClick()}
       >
         <h2 className="text-lg font-bold text-foreground">홈 화면에 추가</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-3 min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
           {deferredPrompt
             ? "아래를 눌러 바로 추가할 수 있어요"
             : "Chrome 또는 Safari에서 눌러주세요"}
