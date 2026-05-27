@@ -36,6 +36,21 @@ MIGRATION_SQL = (
 )
 
 
+def _unwrap_list(raw: object) -> list:
+    """Gemini가 배열을 dict로 감싸 줄 때 배열을 추출."""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        for key in ("grace_notes", "notes", "quotes", "items", "list"):
+            val = raw.get(key)
+            if isinstance(val, list):
+                return val
+        for val in raw.values():
+            if isinstance(val, list):
+                return val
+    return []
+
+
 def normalize_grace_notes(raw: object) -> list[dict]:
     """JSON grace_notes → Supabase jsonb 컬럼용 배열."""
     if raw is None:
@@ -47,6 +62,8 @@ def normalize_grace_notes(raw: object) -> list[dict]:
             data = json.loads(data)
         except json.JSONDecodeError:
             return []
+
+    data = _unwrap_list(data)
 
     if not isinstance(data, list):
         return []

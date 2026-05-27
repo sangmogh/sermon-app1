@@ -3,6 +3,7 @@ import { BookOpen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PageScrollShell, PageStickyHeader } from "@/components/page-layout";
 import { DecisionPrayerSection } from "@/components/decision-prayer-section";
+import { GraceNotesSection } from "@/components/grace-notes-section";
 import { SermonPointsSection } from "@/components/sermon-points-section";
 import { SubPageHeader } from "@/components/sub-page-header";
 import { getSupabase, type Sermon } from "@/lib/supabase";
@@ -84,6 +85,8 @@ export default async function SermonDetailPage({
           </div>
 
           <SermonPointsSection points={sermon.points} videoId={sermon.id} />
+
+          <GraceNotesSection notes={sermon.grace_notes} videoId={sermon.id} />
 
           <DecisionPrayerSection
             prayer={sermon.decision_prayer}

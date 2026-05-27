@@ -4,7 +4,7 @@ import { PageShell } from "@/components/page-layout";
 import { SubPageHeader } from "@/components/sub-page-header";
 import { SearchClient } from "@/app/search/search-client";
 import { getSupabase } from "@/lib/supabase";
-import { computeAllKeywords, computeTopKeywords } from "@/lib/keyword-stats";
+import { computeSearchPopularKeywords } from "@/lib/keyword-stats";
 
 export const metadata = {
   title: "검색 | 오늘의 말씀",
@@ -20,15 +20,14 @@ export default async function SearchPage() {
   }
 
   const rows = data ?? [];
-  const topKeywords = computeTopKeywords(rows, 10);
-  const allKeywords = computeAllKeywords(rows);
+  const topKeywords = computeSearchPopularKeywords(rows, 22);
 
   return (
     <AppShell>
       <PageShell>
-        <SubPageHeader title="검색" subtitle="제목·키워드로 설교를 찾아보세요" />
+        <SubPageHeader showTitle={false} />
         <Suspense fallback={null}>
-          <SearchClient topKeywords={topKeywords} allKeywords={allKeywords} />
+          <SearchClient topKeywords={topKeywords} />
         </Suspense>
       </PageShell>
     </AppShell>

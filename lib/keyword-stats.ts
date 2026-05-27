@@ -105,11 +105,7 @@ export function filterKeywordsByJamo(
   return keywords.filter((keyword) => getKeywordJamoTab(keyword) === jamo);
 }
 
-/** 설교 keywords 배열을 모아 빈도순 상위 키워드 반환 */
-export function computeTopKeywords(
-  rows: { keywords: unknown }[],
-  limit = 20,
-): KeywordStat[] {
+function buildKeywordCounts(rows: { keywords: unknown }[]): Map<string, number> {
   const counts = new Map<string, number>();
 
   for (const row of rows) {
@@ -121,6 +117,71 @@ export function computeTopKeywords(
       counts.set(keyword, (counts.get(keyword) ?? 0) + 1);
     }
   }
+
+  return counts;
+}
+
+/** 검색 인기 키워드에서 제외 (하나님 나라, 하나님의 사랑 등) */
+export function isExcludedFromSearchPopularKeywords(keyword: string): boolean {
+  const k = keyword.trim();
+  if (!k) {
+    return true;
+  }
+  return k === "하나님" || k.startsWith("하나님의 ") || k.startsWith("하나님 ");
+}
+
+/** 검색 화면 인기 키워드 — 항상 노출할 태그 */
+export const PINNED_SEARCH_KEYWORDS = [
+  "친구",
+  "가정",
+  "갈등",
+  "두려움",
+  "실망",
+  "자녀",
+  "관계",
+  "하나님의 심판",
+  "천국",
+] as const;
+
+/**
+ * 검색 인기 키워드: 고정 태그 + DB 빈도 상위(하나님* 제외, 하나님의 심판은 고정).
+ * @param limit 전체 노출 개수 (기본 22)
+ */
+export function computeSearchPopularKeywords(
+  rows: { keywords: unknown }[],
+  limit = 22,
+): KeywordStat[] {
+  const counts = buildKeywordCounts(rows);
+  const pinnedSet = new Set<string>(PINNED_SEARCH_KEYWORDS);
+
+  const pinned: KeywordStat[] = PINNED_SEARCH_KEYWORDS.map((keyword) => ({
+    keyword,
+    count: counts.get(keyword) ?? 0,
+  }));
+
+  const fillerLimit = Math.max(0, limit - pinned.length);
+  const fillers = Array.from(counts.entries())
+    .filter(
+      ([keyword]) =>
+        !pinnedSet.has(keyword) && !isExcludedFromSearchPopularKeywords(keyword),
+    )
+    .map(([keyword, count]) => ({ keyword, count }))
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.keyword.localeCompare(b.keyword, "ko-KR"),
+    )
+    .slice(0, fillerLimit);
+
+  return [...pinned, ...fillers];
+}
+
+/** 설교 keywords 배열을 모아 빈도순 상위 키워드 반환 */
+export function computeTopKeywords(
+  rows: { keywords: unknown }[],
+  limit = 20,
+): KeywordStat[] {
+  const counts = buildKeywordCounts(rows);
 
   return Array.from(counts.entries())
     .map(([keyword, count]) => ({ keyword, count }))

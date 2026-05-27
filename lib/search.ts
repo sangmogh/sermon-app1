@@ -8,6 +8,7 @@ export type SearchResultSermon = {
   title: string;
   core_bible_verse: string;
   keywords: string[];
+  summary?: string;
   sermon_date?: string | null;
 };
 
@@ -132,18 +133,16 @@ export async function searchSermons(
       );
   }
 
-  const { data: exactTagMatches, error: tagError } = await supabase
+  const { data: allSermons, error: allError } = await supabase
     .from("sermons")
-    .select(SERMON_SELECT)
-    .contains("keywords", [tag]);
+    .select(SERMON_SELECT);
 
-  if (tagError) {
-    return mergeUniqueResults([titleResults, keywordResults]);
+  let tagResults: SearchResultSermon[] = [];
+  if (!allError && allSermons) {
+    tagResults = allSermons
+      .map((row) => normalizeRow(row as Record<string, unknown>))
+      .filter((sermon) => sermon.keywords.includes(tag));
   }
-
-  const tagResults = (exactTagMatches ?? []).map((row) =>
-    normalizeRow(row as Record<string, unknown>),
-  );
 
   return mergeUniqueResults([titleResults, keywordResults, tagResults]);
 }

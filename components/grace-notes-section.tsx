@@ -44,7 +44,9 @@ type GraceNotesSectionProps = {
 };
 
 export function GraceNotesSection({ notes, videoId }: GraceNotesSectionProps) {
-  const hasNotes = notes.length > 0;
+  if (notes.length === 0) {
+    return null;
+  }
 
   return (
     <CollapsibleSection
@@ -62,22 +64,17 @@ export function GraceNotesSection({ notes, videoId }: GraceNotesSectionProps) {
       chevronClassName="text-indigo-700/70"
       buttonHoverClassName="hover:bg-indigo-100/40"
       titleClassName="text-indigo-900/80"
+      alwaysOpen
     >
-      {hasNotes ? (
-        <div className="flex flex-col gap-4">
-          {notes.map((note, idx) => (
-            <GraceNoteCard
-              key={`${note.start_seconds}-${note.quote.slice(0, 24)}-${idx}`}
-              note={note}
-              videoId={videoId}
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-2xl bg-white/70 p-4 text-sm leading-relaxed text-gray-600 ring-1 ring-indigo-100/80">
-          은혜의 조각들 데이터가 없습니다.
-        </p>
-      )}
+      <div className="flex flex-col gap-4">
+        {notes.map((note, idx) => (
+          <GraceNoteCard
+            key={`${note.start_seconds}-${note.quote.slice(0, 24)}-${idx}`}
+            note={note}
+            videoId={videoId}
+          />
+        ))}
+      </div>
     </CollapsibleSection>
   );
 }

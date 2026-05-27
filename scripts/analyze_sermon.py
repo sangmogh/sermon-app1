@@ -1,4 +1,6 @@
 import json
+import os
+import random
 import re
 import time
 from pathlib import Path
@@ -10,6 +12,28 @@ from project_env import PROJECT_ROOT, get_gemini_model, load_ai_env
 load_ai_env()
 MODEL_NAME = get_gemini_model()
 client = genai.Client()
+
+def _read_float_env(name: str, default: float) -> float:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+        return value if value >= 0 else default
+    except ValueError:
+        return default
+
+
+GEMINI_CALL_SLEEP_MIN_SEC = _read_float_env("GEMINI_CALL_SLEEP_MIN_SEC", 8.0)
+GEMINI_CALL_SLEEP_MAX_SEC = _read_float_env("GEMINI_CALL_SLEEP_MAX_SEC", 16.0)
+if GEMINI_CALL_SLEEP_MAX_SEC < GEMINI_CALL_SLEEP_MIN_SEC:
+    GEMINI_CALL_SLEEP_MAX_SEC = GEMINI_CALL_SLEEP_MIN_SEC
+
+
+def _sleep_before_gemini(label: str) -> None:
+    sleep_sec = random.uniform(GEMINI_CALL_SLEEP_MIN_SEC, GEMINI_CALL_SLEEP_MAX_SEC)
+    print(f"💤 [{label}] Gemini 호출 전 대기 {sleep_sec:.1f}초...")
+    time.sleep(sleep_sec)
 
 # 스크립트 원문 타임스탬프 패턴: [05:44]
 TIMESTAMP_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2})\]")
@@ -26,12 +50,85 @@ CORE_VERSE_MAX_REF_LEN = 48
 GRACE_FORBIDDEN_LAST_SECONDS = 180
 GRACE_PRAYER_TIME_GAP_SECONDS = 120
 
+# ──────────────────────────────────────────────
+# 표준 키워드 태그 80개 (Gemini는 이 목록 안에서만 선택)
+# ──────────────────────────────────────────────
+STANDARD_KEYWORDS: list[str] = [
+    # 하나님
+    "하나님 나라", "하나님의 사랑", "하나님의 뜻", "하나님의 임재",
+    "하나님의 능력", "하나님의 심판", "하나님 중심", "하나님의 응답",
+    # 예수님
+    "예수님", "예수님의 마음", "십자가", "부활", "구원",
+    # 성령
+    "성령", "성령 충만", "성령의 열매", "영적 싸움",
+    # 믿음·신앙생활
+    "믿음", "회개", "기도", "말씀", "예배", "순종", "결단",
+    "감사", "소망", "은혜",
+    # 제자도·사명
+    "제자", "사명", "섬김", "전도", "헌신", "준비", "겸손", "성실",
+    # 관계
+    "사랑", "용서", "가정", "부모·효도", "자녀", "관계", "친구",
+    "공동체", "소외", "배려", "갈등", "책임",
+    # 내면·정서
+    "두려움", "자존감", "실망", "교만", "욕심", "의심", "분별",
+    "기쁨", "인내", "회복", "자기 이해", "죄·중독", "염려",
+    # 삶의 현장
+    "직장·일상", "재물·청지기", "시간", "세상 가치관", "고난", "봉사",
+    # 종말·구원론
+    "종말", "천국", "구원 확신", "심판",
+    # 성숙·성장
+    "성숙", "성장", "변화", "치유", "축복", "평화", "행함",
+]
+
+# 설교당 표준 태그 개수 (고민 검색 교집합·재현율용)
+KEYWORD_MIN = 6
+KEYWORD_MAX = 10
+
 
 def _output_path(video_id: str) -> Path:
     return PROJECT_ROOT / "output" / f"result_transcript_{video_id}.json"
 
 
-def _build_json_prompt(transcript: str | None = None, *, from_audio: bool = False) -> str:
+def _sermon_date_prompt_block(expected_sermon_date: str | None) -> str:
+    if expected_sermon_date:
+        return f"""
+    [★ sermon_date — 반드시 고정 (유튜브 제목 기준) ★]
+    - 이 설교의 예배일은 **{expected_sermon_date}** 입니다.
+    - sermon_date 필드에는 반드시 "{expected_sermon_date}" 만 넣으세요.
+    - 오디오·본문 속 다른 날짜(역사적 사건, 성경 배경, 추측한 업로드일)는 sermon_date에 쓰지 마세요.
+        """
+    return """
+    [★ sermon_date — 날짜 추출 규칙 ★]
+    - 자막 첫 몇 줄, 제목, 예배 안내 문자에서 "2025년 12월 15일", "25.12.15", "2025-12-15" 등을 찾아 YYYY-MM-DD로 변환하라.
+    - "주일", "예배" 같은 단어 근처에 날짜가 있으면 그것을 사용하라.
+    - 날짜가 두 개 이상 나오면 설교가 전해진 날(예배일)을 우선하라.
+    - 정말 어디에도 날짜가 없을 때만 빈 문자열 "".
+        """
+
+
+def _apply_expected_sermon_date(
+    parsed_data: dict, expected_sermon_date: str | None
+) -> dict:
+    """유튜브 제목에서 확정된 예배일이 있으면 sermon_date를 그 값으로 고정."""
+    if not expected_sermon_date:
+        return parsed_data
+    actual = (parsed_data.get("sermon_date") or "").strip()[:10]
+    if actual != expected_sermon_date:
+        if actual:
+            print(
+                f"ℹ️ sermon_date {actual!r} → 유튜브 제목 기준 "
+                f"{expected_sermon_date!r} 로 고정",
+            )
+        parsed_data["sermon_date"] = expected_sermon_date
+    return parsed_data
+
+
+def _build_json_prompt(
+    transcript: str | None = None,
+    *,
+    from_audio: bool = False,
+    expected_sermon_date: str | None = None,
+) -> str:
     if from_audio:
         source_note = (
             "다음은 교회 예배 설교의 오디오입니다. 청취하여 내용을 분석해 주세요. "
@@ -64,6 +161,16 @@ def _build_json_prompt(transcript: str | None = None, *, from_audio: bool = Fals
     - start_time_seconds는 start_time_text와 항상 일치해야 합니다. 따로 추측하지 마세요.
         """
 
+    standard_keywords_block = (
+        "    [★ keywords — 반드시 아래 표준 목록에서만 선택 ★]\n"
+        "    아래 목록 외 단어를 keywords에 넣지 마라. 목록에 없는 개념은 가장 가까운 표준 태그로 대체하라.\n"
+        f"    개수: {KEYWORD_MIN}~{KEYWORD_MAX}개 (검색용 — 설교에서 다룬 주제·적용을 빠짐없이). # 기호 없이 단어만.\n"
+        "    앞쪽에 핵심 주제, 뒤쪽에 부차 주제·적용을 넣어라. 너무 일반적인 태그(믿음·기도)만으로 채우지 마라.\n\n"
+        "    허용 목록:\n"
+        + ", ".join(STANDARD_KEYWORDS)
+        + "\n"
+    )
+
     transcript_block = ""
     if transcript:
         transcript_block = f"\n    [설교 스크립트 원문]\n    {transcript}\n"
@@ -75,9 +182,9 @@ def _build_json_prompt(transcript: str | None = None, *, from_audio: bool = Fals
 
     {{
         "title": "설교의 핵심 주제를 담은 짧은 제목",
-        "sermon_date": "설교가 전해진 날짜 (예: 2026-05-12). 내용이나 제목에서 유추 불가 시 빈 문자열",
+        "sermon_date": "설교가 전해진 날짜 YYYY-MM-DD. 자막 서두·제목·안내 문자에 날짜가 있으면 반드시 기재. 정말 전혀 없을 때만 빈 문자열",
         "core_bible_verse": "핵심 본문의 성경 참조만 (예: 누가복음 9:36). 본문 인용 금지",
-        "keywords": ["핵심키워드1", "핵심키워드2", "핵심키워드3"],
+        "keywords": ["핵심태그1", "핵심태그2", "핵심태그3", "부차태그4", "부차태그5", "부차태그6"],
         "summary": "전체 내용을 3~4줄로 요약한 텍스트",
         "points": [
             {{
@@ -101,6 +208,9 @@ def _build_json_prompt(transcript: str | None = None, *, from_audio: bool = Fals
         }}
     }}
 
+    {_sermon_date_prompt_block(expected_sermon_date)}
+
+    {standard_keywords_block}
     [★ core_bible_verse (핵심 말씀) — 반드시 참조만 ★]
     - UI에 "누가복음 9:36", "마태복음 5:3-10"처럼 짧은 참조만 표시됩니다.
     - 성경 본문 문장 전체, "이르되 … 하시니라" 같은 인용문은 절대 넣지 마라.
@@ -110,7 +220,7 @@ def _build_json_prompt(transcript: str | None = None, *, from_audio: bool = Fals
     [★ title / keywords — 표기 정확도 ★]
     - 성경 인물·지명은 개역개정 표기를 따르라 (예: 삭개오, 베드로, 갈릴리, 니고데모).
     - 음성 전사 오류를 그대로 쓰지 마라 (예: 사케오 X → 삭개오, 사울/바울 혼동 금지).
-    - keywords는 # 없이 단어만 3~6개. 인물명이 핵심이면 올바른 표기로 넣어라.
+    - keywords는 # 없이 단어만 {KEYWORD_MIN}~{KEYWORD_MAX}개(표준 목록만). 인물명이 핵심이면 올바른 표기로 넣어라.
 
     [★ points vs grace_notes — 역할 분리 (최우선) ★]
     두 필드는 UI에서 나란히 보이므로 내용이 겹치면 안 된다. 반드시 아래 역할을 지켜라.
@@ -332,8 +442,10 @@ def _enforce_grace_notes_distinct(
     (모델이 프롬프트를 어겨도 JSON 저장 전 안전장치)
     """
     points = parsed_data.get("points")
-    notes = parsed_data.get("grace_notes")
+    notes = _unwrap_grace_notes(parsed_data.get("grace_notes"))
+    parsed_data["grace_notes"] = notes
     if not isinstance(notes, list):
+        parsed_data["grace_notes"] = []
         return parsed_data
     if not notes:
         return parsed_data
@@ -433,21 +545,86 @@ def _enforce_grace_notes_distinct(
 
 
 def _normalize_keywords(parsed_data: dict) -> dict:
-    """keywords 배열: # 제거, 공백 정리."""
+    """keywords 배열: # 제거, 표준 목록 필터링, 개수 상한."""
     raw = parsed_data.get("keywords")
+
+    # grace_notes 처럼 가끔 dict 감싸기로 올 때 방어
+    if isinstance(raw, dict):
+        for key in ("keywords", "tags", "list"):
+            if isinstance(raw.get(key), list):
+                raw = raw[key]
+                break
+        else:
+            raw = list(raw.values())
+
     if not isinstance(raw, list):
+        parsed_data["keywords"] = []
         return parsed_data
 
+    standard_set = set(STANDARD_KEYWORDS)
     cleaned: list[str] = []
+    rejected: list[str] = []
+
     for item in raw:
         if not isinstance(item, str):
             continue
         word = item.strip().lstrip("#").strip()
-        if word and word not in cleaned:
-            cleaned.append(word)
+        if not word:
+            continue
+        if word in standard_set:
+            if word not in cleaned:
+                cleaned.append(word)
+        else:
+            rejected.append(word)
+
+    if rejected:
+        print(f"⚠️ keywords 표준 목록 외 단어 제거: {rejected}")
+
+    if not cleaned:
+        print("⚠️ 표준 태그와 일치하는 keywords 없음. 원본 유지.")
+        fallback = []
+        for item in raw:
+            if not isinstance(item, str):
+                continue
+            word = item.strip().lstrip("#").strip()
+            if word and word not in fallback:
+                fallback.append(word)
+        parsed_data["keywords"] = fallback
+        return parsed_data
+
+    if len(cleaned) > KEYWORD_MAX:
+        dropped = cleaned[KEYWORD_MAX:]
+        cleaned = cleaned[:KEYWORD_MAX]
+        print(
+            f"⚠️ keywords {KEYWORD_MAX}개 초과 → 앞 {KEYWORD_MAX}개만 유지, 제거: {dropped}"
+        )
+
+    if len(cleaned) < KEYWORD_MIN:
+        print(
+            f"⚠️ keywords {len(cleaned)}개 — 권장 {KEYWORD_MIN}~{KEYWORD_MAX}개 "
+            f"(검색 품질용, 재분석 시 보완 권장)"
+        )
 
     parsed_data["keywords"] = cleaned
     return parsed_data
+
+
+def _unwrap_grace_notes(raw: object) -> list:
+    """Gemini가 grace_notes를 dict로 감싸 줄 때 배열 추출."""
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        for key in ("grace_notes", "notes", "quotes", "items", "list"):
+            val = raw.get(key)
+            if isinstance(val, list):
+                print(f"ℹ️ grace_notes 객체 감싸기 감지 → '{key}' 키로 배열 추출")
+                return val
+        # 값들 중 list가 있으면 그걸 사용
+        for val in raw.values():
+            if isinstance(val, list):
+                print("ℹ️ grace_notes 객체 감싸기 감지 → 첫 번째 배열 값 추출")
+                return val
+    return []
 
 
 def _normalize_start_time_text(time_text: str) -> str:
@@ -577,7 +754,9 @@ def _wait_for_file_active(uploaded_file):
     return uploaded_file
 
 
-def analyze_sermon(transcript_file_name: str) -> bool:
+def analyze_sermon(
+    transcript_file_name: str, *, expected_sermon_date: str | None = None
+) -> bool:
     """[플랜 A] 자막 텍스트 기반 Gemini 분석."""
     video_id = transcript_file_name.replace("transcript_", "").replace(".txt", "")
     input_path = PROJECT_ROOT / "transcripts" / transcript_file_name
@@ -595,14 +774,18 @@ def analyze_sermon(transcript_file_name: str) -> bool:
         print(f"❌ [플랜 A] 자막 파일이 비어 있습니다: {input_path}")
         return False
 
-    prompt = _build_json_prompt(transcript)
+    prompt = _build_json_prompt(
+        transcript, expected_sermon_date=expected_sermon_date
+    )
 
     try:
+        _sleep_before_gemini("플랜 A")
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
         )
         parsed_data = _parse_gemini_json(response.text)
+        parsed_data = _apply_expected_sermon_date(parsed_data, expected_sermon_date)
         parsed_data = _enforce_core_bible_verse(parsed_data)
         parsed_data = _normalize_keywords(parsed_data)
         parsed_data = _enforce_point_timestamps(parsed_data, transcript=transcript)
@@ -616,7 +799,12 @@ def analyze_sermon(transcript_file_name: str) -> bool:
         return False
 
 
-def analyze_sermon_from_audio(video_id: str, audio_path: str | Path) -> bool:
+def analyze_sermon_from_audio(
+    video_id: str,
+    audio_path: str | Path,
+    *,
+    expected_sermon_date: str | None = None,
+) -> bool:
     """[플랜 B] 오디오 업로드 후 Gemini 멀티모달 분석."""
     audio_path = Path(audio_path)
     print(f"🎧 [플랜 B] {audio_path.name} → {MODEL_NAME} 오디오 분석 중...")
@@ -630,12 +818,16 @@ def analyze_sermon_from_audio(video_id: str, audio_path: str | Path) -> bool:
         uploaded_file = client.files.upload(file=str(audio_path))
         uploaded_file = _wait_for_file_active(uploaded_file)
 
-        prompt = _build_json_prompt(from_audio=True)
+        prompt = _build_json_prompt(
+            from_audio=True, expected_sermon_date=expected_sermon_date
+        )
+        _sleep_before_gemini("플랜 B")
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=[uploaded_file, prompt],
         )
         parsed_data = _parse_gemini_json(response.text)
+        parsed_data = _apply_expected_sermon_date(parsed_data, expected_sermon_date)
         parsed_data = _enforce_core_bible_verse(parsed_data)
         parsed_data = _normalize_keywords(parsed_data)
         parsed_data = _enforce_point_timestamps(parsed_data, transcript=None)
