@@ -1,19 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Download, ExternalLink, Share, Smartphone } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ExternalLink, Smartphone } from "lucide-react";
 import {
   buildAndroidChromeIntentUrl,
   copyPageUrl,
-  getExternalBrowserTarget,
   isAndroid,
   isChromeBrowser,
   isInAppBrowser,
   isIOS,
-  isKakaoTalk,
   isSafariBrowser,
-  needsIosInAppManualBrowser,
-  openInSafari,
 } from "@/lib/open-external-browser";
 
 type BeforeInstallPromptEvent = Event & {
@@ -21,13 +17,11 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-type InstallMode =
-  | "open-external"
-  | "install-ready"
-  | "install-hint"
-  | "hidden";
+type InstallMode = "open-external" | "install-ready" | "install-hint";
 
 type DevicePlatform = "ios" | "android" | "other";
+
+type AccentChipKind = "open" | "copy" | "download";
 
 function detectPlatform(): DevicePlatform {
   if (typeof navigator === "undefined") {
@@ -49,20 +43,15 @@ function detectInstallMode(): InstallMode {
   }
 
   const ua = navigator.userAgent;
-  const inApp = isInAppBrowser(ua);
-
-  if (inApp) {
+  if (isInAppBrowser(ua)) {
     return "open-external";
   }
-
   if (isIOS(ua)) {
     return isSafariBrowser(ua) ? "install-ready" : "open-external";
   }
-
   if (isAndroid(ua)) {
     return isChromeBrowser(ua) ? "install-ready" : "open-external";
   }
-
   return "install-hint";
 }
 
@@ -71,107 +60,102 @@ function getInstallHint(platform: DevicePlatform): string {
     return "하단 공유(□↑) → 「홈 화면에 추가」 → 「추가」";
   }
   if (platform === "android") {
-    return "설치 창이 안 뜨면 Chrome 메뉴(⋮) → 「앱 설치」 또는 이 카드를 다시 눌러주세요.";
+    return "설치 창이 안 뜨면 Chrome 메뉴(⋮) → 「앱 설치」를 눌러주세요.";
   }
-  return "휴대폰 Chrome 또는 Safari에서 이 카드를 눌러주세요.";
+  return "휴대폰 Chrome 또는 Safari에서 열어주세요.";
 }
 
-function IosInAppSafariGuide({ inKakao }: { inKakao: boolean }) {
+const CHIP_MUTED =
+  "rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground";
+const CHIP_ACCENT =
+  "rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm";
+
+function ChipHintRow({
+  subtitle,
+  accentKind,
+  accentHref,
+  onAccentClick,
+}: {
+  subtitle: string;
+  accentKind: AccentChipKind;
+  accentHref?: string;
+  onAccentClick?: () => void;
+}) {
+  const accentLabel =
+    accentKind === "open"
+      ? "열기"
+      : accentKind === "copy"
+        ? "주소복사"
+        : "다운로드";
+
+  const accentNode =
+    accentHref !== undefined ? (
+      <a
+        href={accentHref}
+        className={`${CHIP_ACCENT} shrink-0 transition active:scale-[0.98]`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {accentLabel}
+      </a>
+    ) : (
+      <button
+        type="button"
+        className={`${CHIP_ACCENT} shrink-0 transition active:scale-[0.98]`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onAccentClick?.();
+        }}
+      >
+        {accentLabel}
+      </button>
+    );
+
   return (
-    <div className="mt-3 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3">
-      <ol className="space-y-2 text-xs leading-relaxed text-foreground">
-        <li className="flex gap-2">
-          <span className="font-bold text-orange-600">1</span>
-          <span>
-            화면 <strong>오른쪽 아래 ···</strong>
-            {inKakao ? " (또는 공유 모양)" : ""} 을 눌러주세요
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span className="font-bold text-orange-600">2</span>
-          <span>
-            <strong className="text-orange-600">Safari에서 열기</strong>를
-            눌러주세요
-          </span>
-        </li>
-        <li className="flex gap-2">
-          <span className="font-bold text-orange-600">3</span>
-          <span>Safari에서 다시 이 페이지의 설치 안내를 따라주세요</span>
-        </li>
-      </ol>
-      <p className="mt-2 text-center text-[11px] text-muted-foreground">
-        ※ 「열기」만 누르면 카카오 안에서만 다시 열려 설치가 안 됩니다
-      </p>
+    <div className="mt-2 w-full">
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5" aria-hidden>
+          <span className={CHIP_MUTED}>바로가기</span>
+          <span className={CHIP_MUTED}>둘러보기</span>
+        </div>
+        {accentNode}
+      </div>
     </div>
   );
 }
 
-function KakaoOpenHint({ platform }: { platform: DevicePlatform }) {
-  if (platform === "ios") {
-    return null;
-  }
+function InstallCardShell({
+  icon: Icon,
+  children,
+  onCardClick,
+  asButton = false,
+}: {
+  icon: typeof ExternalLink;
+  children: ReactNode;
+  onCardClick?: () => void;
+  asButton?: boolean;
+}) {
+  const className =
+    "relative block h-fit w-full rounded-3xl bg-gradient-to-br from-orange-50 to-amber-100 p-6 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]";
 
-  if (platform === "android") {
-    return (
-      <div
-        className="mt-3 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3"
-        aria-hidden
-      >
-        <p className="mb-2 text-center text-[11px] text-muted-foreground">
-          이렇게 나오면{" "}
-          <span className="font-semibold text-orange-600">Chrome에서 열기</span>
-          또는 <span className="font-semibold text-orange-600">열기</span>를
-          눌러주세요
-        </p>
-        <div className="flex justify-center gap-1.5">
-          <span className="rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
-            둘러보기
-          </span>
-          <span className="rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm">
-            Chrome에서 열기
-          </span>
-        </div>
+  const inner = (
+    <>
+      <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
+        <Icon className="size-6 text-orange-500" strokeWidth={2} />
       </div>
+      <div className="flex flex-col items-start pr-14">{children}</div>
+    </>
+  );
+
+  if (asButton) {
+    return (
+      <button type="button" onClick={onCardClick} className={className}>
+        {inner}
+      </button>
     );
   }
 
-  return null;
-}
-
-function InstallStepHint({ platform }: { platform: DevicePlatform }) {
-  if (platform === "ios") {
-    return (
-      <div
-        className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3"
-        aria-hidden
-      >
-        <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-          <Share className="size-3.5" aria-hidden />
-          공유
-        </span>
-        <span className="text-xs text-muted-foreground">→</span>
-        <span className="rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm">
-          홈 화면에 추가
-        </span>
-      </div>
-    );
-  }
-
-  if (platform === "android") {
-    return (
-      <div
-        className="mt-3 flex items-center justify-center gap-2 rounded-2xl border border-orange-200/80 bg-white/90 px-3 py-3"
-        aria-hidden
-      >
-        <span className="inline-flex items-center gap-1 rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm">
-          <Download className="size-3.5" aria-hidden />
-          다운로드 / 앱 설치
-        </span>
-      </div>
-    );
-  }
-
-  return null;
+  return <div className={className}>{inner}</div>;
 }
 
 export function PwaInstallCard() {
@@ -182,16 +166,11 @@ export function PwaInstallCard() {
   const [mode, setMode] = useState<InstallMode>("install-hint");
   const [platform, setPlatform] = useState<DevicePlatform>("other");
   const [pageUrl, setPageUrl] = useState("");
-  const [inKakao, setInKakao] = useState(false);
-  const [iosManualEscape, setIosManualEscape] = useState(false);
 
   useEffect(() => {
-    const ua = navigator.userAgent;
     setPageUrl(window.location.href);
     setPlatform(detectPlatform());
     setMode(detectInstallMode());
-    setInKakao(isKakaoTalk(ua));
-    setIosManualEscape(needsIosInAppManualBrowser(ua));
 
     const standalone = window.matchMedia(
       "(display-mode: standalone)",
@@ -235,17 +214,6 @@ export function PwaInstallCard() {
     window.setTimeout(() => setFeedback(null), 8000);
   }, [deferredPrompt, platform]);
 
-  const handleSafariOpen = useCallback(() => {
-    if (!pageUrl || iosManualEscape) {
-      return;
-    }
-    openInSafari(pageUrl);
-    setFeedback(
-      "Safari가 안 열리면 ⋯ 메뉴에서 「Safari에서 열기」 또는 「다른 브라우저로 열기」를 눌러주세요.",
-    );
-    window.setTimeout(() => setFeedback(null), 10000);
-  }, [pageUrl, iosManualEscape]);
-
   const handleCopyLink = useCallback(async () => {
     if (!pageUrl) {
       return;
@@ -253,128 +221,82 @@ export function PwaInstallCard() {
     const ok = await copyPageUrl(pageUrl);
     setFeedback(
       ok
-        ? "주소가 복사됐어요. Safari를 연 뒤 주소창에 붙여넣기 해 주세요."
-        : "복사가 안 되면 아래 안내대로 Safari에서 열기를 눌러주세요.",
+        ? "주소가 복사됐어요. Safari 주소창에 붙여넣기 해 주세요."
+        : "복사에 실패했어요. ⋯ 메뉴에서 Safari에서 열기를 눌러주세요.",
     );
-    window.setTimeout(() => setFeedback(null), 10000);
+    window.setTimeout(() => setFeedback(null), 8000);
   }, [pageUrl]);
 
   if (isInstalled) {
     return null;
   }
 
-  const externalTarget = getExternalBrowserTarget();
+  if (platform === "other" && mode === "install-hint") {
+    return null;
+  }
+
   const androidIntentUrl = pageUrl ? buildAndroidChromeIntentUrl(pageUrl) : "#";
-  const isSafariTarget = externalTarget === "safari";
+
+  const feedbackLine = feedback ? (
+    <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
+      {feedback}
+    </p>
+  ) : null;
 
   if (mode === "open-external") {
+    const isIos = platform === "ios";
+
     return (
       <div className="w-full">
-        <div className="relative w-full rounded-3xl bg-gradient-to-br from-orange-50 to-amber-100 p-6 shadow-sm">
-          <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
-            <ExternalLink className="size-6 text-orange-500" strokeWidth={2} />
-          </div>
-
-          <div className="flex flex-col items-start pr-14">
-            <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {iosManualEscape ? (
-                <>
-                  Safari에서 열어야 설치할 수 있어요.
-                  <br />
-                  아래 순서대로 진행해 주세요.
-                </>
-              ) : (
-                <>
-                  {inKakao ? "카카오톡" : "이 앱"} 안에서는 설치가 어려워요.
-                  <br />
-                  {platform === "android"
-                    ? "아래를 누른 뒤 Chrome에서 열기(또는 열기)를 눌러주세요."
-                    : "아래 버튼으로 Safari에서 열어주세요."}
-                </>
-              )}
-            </p>
-            {iosManualEscape ? (
-              <IosInAppSafariGuide inKakao={inKakao} />
-            ) : (
-              <KakaoOpenHint platform={platform} />
-            )}
-          </div>
-
-          <div className="mt-4 space-y-2">
-            {iosManualEscape ? (
-              <button
-                type="button"
-                onClick={() => void handleCopyLink()}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition active:scale-[0.99]"
-              >
-                주소 복사하기
-              </button>
-            ) : isSafariTarget ? (
-              <button
-                type="button"
-                onClick={handleSafariOpen}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition active:scale-[0.99]"
-              >
-                앱 설치하기
-              </button>
-            ) : (
-              <a
-                href={androidIntentUrl}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-orange-500 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition active:scale-[0.99]"
-              >
-                앱 설치하기
-              </a>
-            )}
-          </div>
-        </div>
-        {feedback ? (
-          <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
-            {feedback}
-          </p>
-        ) : null}
+        <InstallCardShell icon={ExternalLink}>
+          <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+          {isIos ? (
+            <ChipHintRow
+              subtitle="safari에서 열어주세요"
+              accentKind="copy"
+              onAccentClick={() => void handleCopyLink()}
+            />
+          ) : (
+            <ChipHintRow
+              subtitle="열기 버튼을 눌러주세요"
+              accentKind="open"
+              accentHref={androidIntentUrl}
+            />
+          )}
+        </InstallCardShell>
+        {feedbackLine}
       </div>
     );
   }
 
-  const installTitle =
-    platform === "android" ? "앱 설치하기" : "홈 화면에 추가하기";
-  const installDescription =
-    platform === "ios"
-      ? "이제 홈 화면에 추가할 수 있어요"
-      : platform === "android"
-        ? "이제 다운로드(설치)할 수 있어요"
-        : mode === "install-ready"
-          ? "아래를 눌러 바로 추가할 수 있어요"
-          : "Chrome 또는 Safari에서 눌러주세요";
+  if (mode === "install-ready") {
+    return (
+      <div className="w-full">
+        <InstallCardShell
+          icon={Smartphone}
+          asButton
+          onCardClick={() => void handleInstallClick()}
+        >
+          <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+          <ChipHintRow
+            subtitle="이제 다운로드할 수 있어요"
+            accentKind="download"
+            onAccentClick={() => void handleInstallClick()}
+          />
+        </InstallCardShell>
+        {feedbackLine}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">
-      <button
-        type="button"
-        onClick={() => void handleInstallClick()}
-        className="relative block h-fit w-full rounded-3xl bg-gradient-to-br from-orange-50 to-amber-100 p-6 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]"
-      >
-        <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
-          <Smartphone className="size-6 text-orange-500" strokeWidth={2} />
-        </div>
-
-        <div className="flex w-full flex-col items-start pr-14">
-          <h2 className="text-lg font-bold text-foreground">{installTitle}</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {installDescription}
-          </p>
-          {(platform === "ios" || platform === "android") &&
-          mode === "install-ready" ? (
-            <InstallStepHint platform={platform} />
-          ) : null}
-        </div>
-      </button>
-      {feedback ? (
-        <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
-          {feedback}
+      <InstallCardShell icon={Smartphone}>
+        <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Chrome 또는 Safari에서 열어주세요
         </p>
-      ) : null}
+      </InstallCardShell>
     </div>
   );
 }
