@@ -25,7 +25,7 @@ type AccentPillKind = "open" | "copy" | "download";
 
 /** 홈 파란/초록 카드의 바로가기·둘러보기 pill 과 동일 형태 */
 const ORANGE_PILL_CLASS =
-  "shrink-0 inline-flex rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
+  "inline-flex shrink-0 rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
 
 function detectPlatform(): DevicePlatform {
   if (typeof navigator === "undefined") {
@@ -110,8 +110,8 @@ function InstallCardActionRow({
     );
 
   return (
-    <div className="mt-3 flex min-h-11 w-full items-end justify-between gap-3">
-      <p className="min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
+    <div className="mt-3 flex w-full flex-nowrap items-center justify-between gap-2">
+      <p className="whitespace-nowrap text-sm leading-none text-muted-foreground">
         {subtitle}
       </p>
       {pill}
