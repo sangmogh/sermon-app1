@@ -23,9 +23,9 @@ type DevicePlatform = "ios" | "android" | "other";
 
 type AccentPillKind = "open" | "copy" | "download";
 
-/** 홈 바로가기·둘러보기 pill 과 동일 패딩/타이포 + 주황 pill 공통 고정 너비 */
+/** 홈 page.tsx 바로가기·둘러보기 pill 과 동일 크기 (색만 주황) */
 const ORANGE_PILL_CLASS =
-  "box-border inline-flex w-[6.25rem] shrink-0 items-center justify-center rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
+  "inline-flex shrink-0 rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
 
 const CARD_TITLE_CLASS = "pr-14 text-lg font-bold text-foreground";
 
