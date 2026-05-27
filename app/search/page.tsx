@@ -20,7 +20,7 @@ export default async function SearchPage() {
   }
 
   const rows = data ?? [];
-  const topKeywords = computeSearchPopularKeywords(rows, 22);
+  const topKeywords = computeSearchPopularKeywords(rows, 10);
 
   return (
     <AppShell>
