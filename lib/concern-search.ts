@@ -146,6 +146,16 @@ export async function fetchAllSearchSermons(): Promise<SearchResultSermon[]> {
   );
 }
 
+function hasGeminiApiKey(): boolean {
+  return Boolean(
+    (
+      process.env.GEMINI_API_KEY ??
+      process.env.NEXT_PUBLIC_GEMINI_API_KEY ??
+      ""
+    ).trim(),
+  );
+}
+
 function readGeminiApiKey(): string {
   const key = (
     process.env.GEMINI_API_KEY ??
@@ -154,7 +164,7 @@ function readGeminiApiKey(): string {
   ).trim();
   if (!key) {
     throw new Error(
-      "GEMINI_API_KEY가 설정되지 않았습니다. .env 또는 Vercel 환경 변수에 추가해 주세요.",
+      "GEMINI_API_KEY가 설정되지 않았습니다. .env.local 또는 Vercel 환경 변수에 추가해 주세요.",
     );
   }
   return key;
@@ -321,6 +331,54 @@ export type ConcernSearchResponse = {
   query: string;
 };
 
+/** Gemini 키 없을 때 제목·요약·키워드 단순 매칭 (배포 환경 폴백) */
+function searchSermonsBySimpleTextMatch(
+  query: string,
+  all: SearchResultSermon[],
+): SearchResultSermon[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return [];
+  }
+
+  const tokens = normalized.split(/\s+/).filter(Boolean);
+
+  return all
+    .map((sermon) => {
+      const haystack = [
+        sermon.title,
+        sermon.summary ?? "",
+        sermon.core_bible_verse,
+        ...sermon.keywords,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      let score = 0;
+      if (haystack.includes(normalized)) {
+        score += 10;
+      }
+      for (const token of tokens) {
+        if (haystack.includes(token)) {
+          score += 1;
+        }
+      }
+
+      return { sermon, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      const da = a.sermon.sermon_date ?? "";
+      const db = b.sermon.sermon_date ?? "";
+      return db.localeCompare(da);
+    })
+    .slice(0, EMBEDDING_TOP_K)
+    .map((row) => row.sermon);
+}
+
 async function searchSermonsByEmbedding(
   query: string,
   all: SearchResultSermon[],
@@ -380,16 +438,39 @@ export async function searchSermonsByConcern(
 ): Promise<ConcernSearchResponse> {
   const trimmed = query.trim();
   const all = await fetchAllSearchSermons();
+  const emptyTags: Pick<ConcernSearchResponse, "tagScores" | "primaryTags"> = {
+    tagScores: [],
+    primaryTags: [],
+  };
 
-  const embeddingResults = await searchSermonsByEmbedding(trimmed, all);
-  if (embeddingResults !== null) {
+  if (!hasGeminiApiKey()) {
     return {
-      results: embeddingResults,
-      tagScores: [],
-      primaryTags: [],
+      results: searchSermonsBySimpleTextMatch(trimmed, all),
+      ...emptyTags,
       query: trimmed,
     };
   }
 
-  return searchSermonsByConcernTags(trimmed, all);
+  try {
+    const embeddingResults = await searchSermonsByEmbedding(trimmed, all);
+    if (embeddingResults !== null) {
+      return {
+        results: embeddingResults,
+        ...emptyTags,
+        query: trimmed,
+      };
+    }
+  } catch {
+    // 임베딩 실패 시 태그·단순 검색으로 폴백
+  }
+
+  try {
+    return await searchSermonsByConcernTags(trimmed, all);
+  } catch {
+    return {
+      results: searchSermonsBySimpleTextMatch(trimmed, all),
+      ...emptyTags,
+      query: trimmed,
+    };
+  }
 }

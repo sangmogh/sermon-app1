@@ -8,7 +8,7 @@ function readGeminiApiKey(): string {
   ).trim();
   if (!key) {
     throw new Error(
-      "GEMINI_API_KEY가 설정되지 않았습니다. .env.local에 추가해 주세요.",
+      "GEMINI_API_KEY가 설정되지 않았습니다. .env.local 또는 Vercel 환경 변수에 추가해 주세요.",
     );
   }
   return key;
