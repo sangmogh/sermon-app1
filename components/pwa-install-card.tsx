@@ -23,9 +23,11 @@ type DevicePlatform = "ios" | "android" | "other";
 
 type AccentPillKind = "open" | "copy" | "download";
 
-/** 홈 파란/초록 카드의 바로가기·둘러보기 pill 과 동일 형태 */
+/** 홈 바로가기·둘러보기 pill 과 동일 패딩/타이포 + 주황 pill 공통 고정 너비 */
 const ORANGE_PILL_CLASS =
-  "inline-flex shrink-0 rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
+  "box-border inline-flex w-[6.25rem] shrink-0 items-center justify-center rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
+
+const CARD_TITLE_CLASS = "pr-14 text-lg font-bold text-foreground";
 
 function detectPlatform(): DevicePlatform {
   if (typeof navigator === "undefined") {
@@ -110,8 +112,8 @@ function InstallCardActionRow({
     );
 
   return (
-    <div className="mt-3 flex w-full flex-nowrap items-center justify-between gap-2">
-      <p className="whitespace-nowrap text-sm leading-none text-muted-foreground">
+    <div className="mt-3 flex w-full flex-nowrap items-center justify-between gap-3">
+      <p className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm leading-snug text-muted-foreground">
         {subtitle}
       </p>
       {pill}
@@ -138,7 +140,7 @@ function InstallCardShell({
       <div className="absolute right-6 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/80 shadow-sm">
         <Icon className="size-6 text-orange-500" strokeWidth={2} />
       </div>
-      <div className="flex w-full flex-col items-stretch pr-14">{children}</div>
+      <div className="flex w-full flex-col">{children}</div>
     </>
   );
 
@@ -240,7 +242,7 @@ export function PwaInstallCard() {
     return (
       <div className="w-full">
         <InstallCardShell icon={ExternalLink}>
-          <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+          <h2 className={CARD_TITLE_CLASS}>앱 설치하기</h2>
           {isIos ? (
             <InstallCardActionRow
               subtitle="safari에서 열어주세요"
@@ -268,7 +270,7 @@ export function PwaInstallCard() {
           asButton
           onCardClick={() => void handleInstallClick()}
         >
-          <h2 className="text-lg font-bold text-foreground">앱 설치하기</h2>
+          <h2 className={CARD_TITLE_CLASS}>앱 설치하기</h2>
           <InstallCardActionRow
             subtitle="이제 다운로드할 수 있어요"
             accentKind="download"
@@ -287,8 +289,8 @@ export function PwaInstallCard() {
         asButton
         onCardClick={() => void handleInstallClick()}
       >
-        <h2 className="text-lg font-bold text-foreground">홈 화면에 추가</h2>
-        <p className="mt-3 min-w-0 flex-1 text-sm leading-snug text-muted-foreground">
+        <h2 className={CARD_TITLE_CLASS}>홈 화면에 추가</h2>
+        <p className="mt-3 text-sm leading-snug text-muted-foreground">
           {deferredPrompt
             ? "아래를 눌러 바로 추가할 수 있어요"
             : "Chrome 또는 Safari에서 눌러주세요"}
