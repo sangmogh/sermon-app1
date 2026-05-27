@@ -5,6 +5,7 @@ import { PageScrollShell, PageStickyHeader } from "@/components/page-layout";
 import { DecisionPrayerSection } from "@/components/decision-prayer-section";
 import { GraceNotesSection } from "@/components/grace-notes-section";
 import { SermonPointsSection } from "@/components/sermon-points-section";
+import { ScrollToTopOnMount } from "@/components/scroll-to-top";
 import { SubPageHeader } from "@/components/sub-page-header";
 import { getSupabase, type Sermon } from "@/lib/supabase";
 import { formatSermonDateLabel } from "@/lib/archive";
@@ -55,6 +56,7 @@ export default async function SermonDetailPage({
   return (
     <AppShell>
       <PageScrollShell>
+        <ScrollToTopOnMount />
         <PageStickyHeader>
           <SubPageHeader showTitle={false} />
         </PageStickyHeader>
