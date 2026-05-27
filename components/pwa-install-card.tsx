@@ -6,7 +6,6 @@ import {
   buildAndroidChromeIntentUrl,
   copyPageUrl,
   isAndroid,
-  isChromeBrowser,
   isInAppBrowser,
   isIOS,
   isSafariBrowser,
@@ -25,7 +24,7 @@ type AccentPillKind = "open" | "copy" | "download";
 
 /** 홈 둘러보기 pill 과 비슷한 크기, 열기·주소복사·다운로드 동일 너비 */
 const ORANGE_PILL_CLASS =
-  "box-border inline-flex w-[5.5rem] shrink-0 items-center justify-center rounded-full bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
+  "box-border inline-flex w-[5.5rem] shrink-0 items-center justify-center rounded-full border-0 bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white no-underline transition active:scale-[0.98]";
 
 const CARD_TITLE_CLASS = "pr-14 text-lg font-bold text-foreground";
 
@@ -56,7 +55,7 @@ function detectInstallMode(): InstallMode {
     return isSafariBrowser(ua) ? "install-ready" : "open-external";
   }
   if (isAndroid(ua)) {
-    return isChromeBrowser(ua) ? "install-ready" : "open-external";
+    return "install-ready";
   }
   return "install-hint";
 }
@@ -74,12 +73,10 @@ function getInstallHint(platform: DevicePlatform): string {
 function InstallCardActionRow({
   subtitle,
   accentKind,
-  accentHref,
   onAccentClick,
 }: {
   subtitle: string;
   accentKind: AccentPillKind;
-  accentHref?: string;
   onAccentClick?: () => void;
 }) {
   const accentLabel =
@@ -89,27 +86,18 @@ function InstallCardActionRow({
         ? "주소복사"
         : "다운로드";
 
-  const pill =
-    accentHref !== undefined ? (
-      <a
-        href={accentHref}
-        className={ORANGE_PILL_CLASS}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {accentLabel}
-      </a>
-    ) : (
-      <button
-        type="button"
-        className={ORANGE_PILL_CLASS}
-        onClick={(event) => {
-          event.stopPropagation();
-          onAccentClick?.();
-        }}
-      >
-        {accentLabel}
-      </button>
-    );
+  const pill = (
+    <button
+      type="button"
+      className={ORANGE_PILL_CLASS}
+      onClick={(event) => {
+        event.stopPropagation();
+        onAccentClick?.();
+      }}
+    >
+      {accentLabel}
+    </button>
+  );
 
   return (
     <div className="mt-3 flex w-full flex-nowrap items-center justify-between gap-3">
@@ -224,11 +212,16 @@ export function PwaInstallCard() {
     window.setTimeout(() => setFeedback(null), 8000);
   }, [pageUrl]);
 
+  const openInAndroidChrome = useCallback(() => {
+    if (!pageUrl) {
+      return;
+    }
+    window.location.assign(buildAndroidChromeIntentUrl(pageUrl));
+  }, [pageUrl]);
+
   if (isInstalled) {
     return null;
   }
-
-  const androidIntentUrl = pageUrl ? buildAndroidChromeIntentUrl(pageUrl) : "#";
 
   const feedbackLine = feedback ? (
     <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
@@ -243,19 +236,15 @@ export function PwaInstallCard() {
       <div className="w-full">
         <InstallCardShell icon={ExternalLink}>
           <h2 className={CARD_TITLE_CLASS}>앱 설치하기</h2>
-          {isIos ? (
-            <InstallCardActionRow
-              subtitle="safari에서 열어주세요"
-              accentKind="copy"
-              onAccentClick={() => void handleCopyLink()}
-            />
-          ) : (
-            <InstallCardActionRow
-              subtitle="열기 버튼을 눌러주세요"
-              accentKind="open"
-              accentHref={androidIntentUrl}
-            />
-          )}
+          <InstallCardActionRow
+            subtitle={
+              isIos ? "safari에서 열어주세요" : "열기 버튼을 눌러주세요"
+            }
+            accentKind={isIos ? "copy" : "open"}
+            onAccentClick={() =>
+              void (isIos ? handleCopyLink() : openInAndroidChrome())
+            }
+          />
         </InstallCardShell>
         {feedbackLine}
       </div>
