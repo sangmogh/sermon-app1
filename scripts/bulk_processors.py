@@ -4,6 +4,7 @@
 - 스킵 전에도 기존 JSON 검증 (틀리면 삭제 후 재분석)
 - 분석 전: 재생목록 제목 YYMMDD → Gemini에 sermon_date 고정
 - 분석 후: 불일치 시 유튜브 제목 날짜로 JSON 보정 (삭제·재분석 없음)
+- 분석 모델: .env BULK_GEMINI_MODEL (기본 gemini-2.5-flash-lite). 검색용 GEMINI_MODEL 과 분리.
 이미 분석된 JSON은 건너뛰며 짧은 sleep, API 호출 후에는 25~45초 sleep.
 
 전체 재시작: python scripts/reset_bulk_artifacts.py --yes

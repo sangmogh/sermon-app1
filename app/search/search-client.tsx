@@ -82,16 +82,21 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
     }
   }, []);
 
-  const syncQueryToUrl = useCallback((query: string) => {
+  const syncQueryToUrl = useCallback(
+    (query: string, mode: "concern" | "tag" = "concern") => {
     if (typeof window === "undefined") {
       return;
     }
-    const next = `/search?q=${encodeURIComponent(query)}`;
+      const queryParam = `q=${encodeURIComponent(query)}`;
+      const modeParam = mode === "tag" ? "&mode=tag" : "";
+      const next = `/search?${queryParam}${modeParam}`;
     if (window.location.pathname + window.location.search === next) {
       return;
     }
     window.history.replaceState(window.history.state, "", next);
-  }, []);
+    },
+    [],
+  );
 
   const runConcernSearch = useCallback(
     async (value: string, options?: { syncUrl?: boolean }) => {
@@ -114,7 +119,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
       setDisplayQuery(trimmed);
 
       if (options?.syncUrl !== false) {
-        syncQueryToUrl(trimmed);
+        syncQueryToUrl(trimmed, "concern");
       }
 
       try {
@@ -168,6 +173,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
 
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
+    const mode = searchParams.get("mode") ?? "concern";
     setInputValue(q);
     const trimmed = q.trim();
     if (!trimmed) {
@@ -175,6 +181,10 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
       return;
     }
     if (trimmed === lastSearchedRef.current) {
+      return;
+    }
+    if (mode === "tag") {
+      void runTagSearch(trimmed);
       return;
     }
     void runConcernSearchRef.current(trimmed, { syncUrl: false });
@@ -188,9 +198,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
   const handleTagClick = (tag: string) => {
     lastSearchedRef.current = `tag:${tag}`;
     setInputValue(tag);
-    if (typeof window !== "undefined") {
-      window.history.replaceState(window.history.state, "", "/search");
-    }
+    syncQueryToUrl(tag, "tag");
     void runTagSearch(tag);
   };
 

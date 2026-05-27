@@ -7,10 +7,10 @@ from pathlib import Path
 
 from google import genai
 
-from project_env import PROJECT_ROOT, get_gemini_model, load_ai_env
+from project_env import PROJECT_ROOT, get_bulk_gemini_model, load_ai_env
 
 load_ai_env()
-MODEL_NAME = get_gemini_model()
+MODEL_NAME = get_bulk_gemini_model()
 client = genai.Client()
 
 def _read_float_env(name: str, default: float) -> float:
