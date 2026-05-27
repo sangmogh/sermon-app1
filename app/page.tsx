@@ -37,7 +37,7 @@ export default async function HomePage() {
           >
             <Search className="size-5 shrink-0 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">
-              키워드로 검색해보세요
+              고민이 있나요?
             </span>
           </Link>
 

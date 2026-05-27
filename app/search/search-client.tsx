@@ -210,7 +210,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
             type="search"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
-            placeholder="예: 구원의 확신이 없어요"
+            placeholder="고민을 입력해보세요"
             className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
             autoComplete="off"
             enterKeyHint="search"
@@ -224,7 +224,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
           </button>
         </div>
         <div className="mt-2 px-1 text-xs leading-relaxed text-muted-foreground">
-          <p>고민이나 상황을 적으면 적절한 설교를 찾아드려요</p>
+          <p>고민이나 상황을 적으면 설교를 찾아드려요</p>
           <p className="mt-1.5 text-muted-foreground/80">
             예: 구원의 확신이 없어요 · 믿음을 키우는 법
           </p>
