@@ -6,6 +6,7 @@ import {
   buildAndroidChromeIntentUrl,
   copyPageUrl,
   isAndroid,
+  isChromeBrowser,
   isInAppBrowser,
   isIOS,
   isSafariBrowser,
@@ -22,9 +23,9 @@ type DevicePlatform = "ios" | "android" | "other";
 
 type AccentPillKind = "open" | "copy" | "download";
 
-/** 홈 둘러보기 pill 과 비슷한 크기, 열기·주소복사·다운로드 동일 너비 */
+/** page.tsx 둘러보기 pill 과 동일 패딩·타이포; 주황 3종 동일 너비·한 줄 */
 const ORANGE_PILL_CLASS =
-  "box-border inline-flex w-[5.5rem] shrink-0 items-center justify-center rounded-full border-0 bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white no-underline transition active:scale-[0.98]";
+  "box-border inline-flex w-[5.85rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full border-0 bg-orange-500 px-4 py-1.5 text-sm font-semibold leading-none text-white transition active:scale-[0.98]";
 
 const CARD_TITLE_CLASS = "pr-14 text-lg font-bold text-foreground";
 
@@ -55,7 +56,7 @@ function detectInstallMode(): InstallMode {
     return isSafariBrowser(ua) ? "install-ready" : "open-external";
   }
   if (isAndroid(ua)) {
-    return "install-ready";
+    return isChromeBrowser(ua) ? "install-ready" : "open-external";
   }
   return "install-hint";
 }
