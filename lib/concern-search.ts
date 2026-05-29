@@ -18,7 +18,7 @@ const EMBEDDING_TOP_K = 20;
 const EMBEDDING_MIN_SCORE = 0.55;
 
 const SERMON_SELECT =
-  "id, title, core_bible_verse, keywords, summary, sermon_date, created_at";
+  "id, title, core_bible_verse, keywords, summary, sermon_date, preacher, created_at";
 
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
 
@@ -42,6 +42,7 @@ function normalizeRow(row: Record<string, unknown>): SearchResultSermon {
         : sermonDate === null
           ? null
           : undefined,
+    preacher: typeof row.preacher === "string" ? row.preacher : null,
   };
 }
 

@@ -10,6 +10,8 @@ export type SearchResultSermon = {
   keywords: string[];
   summary?: string;
   sermon_date?: string | null;
+  /** 설교자 이름 — 결과 카드에 'OOO 목사' 라벨로 표시 (있을 때만) */
+  preacher?: string | null;
   /** 고민(임베딩) 검색에서 이 설교를 끌어올린 포인트 제목 (요약 매칭이면 없음) */
   matchedPointTitle?: string;
 };
@@ -17,7 +19,7 @@ export type SearchResultSermon = {
 export const POPULAR_TAGS = ["위로", "결단", "가족", "사명", "믿음"] as const;
 
 const SERMON_SELECT =
-  "id, title, core_bible_verse, keywords, sermon_date, created_at";
+  "id, title, core_bible_verse, keywords, sermon_date, preacher, created_at";
 
 /** PostgREST ilike 와일드카드 이스케이프 */
 export function escapeIlikePattern(value: string): string {
@@ -37,6 +39,7 @@ function normalizeRow(row: Record<string, unknown>): SearchResultSermon {
         : sermonDate === null
           ? null
           : undefined,
+    preacher: typeof row.preacher === "string" ? row.preacher : null,
   };
 }
 
@@ -49,6 +52,7 @@ function rowToSermon(row: SearchResultSermon): Sermon {
     summary: "",
     points: [],
     sermon_date: row.sermon_date ?? null,
+    preacher: row.preacher ?? null,
     created_at: "",
   };
 }
@@ -74,6 +78,7 @@ function mergeUniqueResults(
     core_bible_verse: sermon.core_bible_verse,
     keywords: sermon.keywords,
     sermon_date: sermon.sermon_date,
+    preacher: sermon.preacher ?? null,
   }));
 }
 

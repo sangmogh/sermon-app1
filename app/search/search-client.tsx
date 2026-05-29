@@ -300,9 +300,16 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                 href={`/sermon/${result.id}`}
                 className="flex flex-col items-start rounded-2xl bg-card p-5 text-left shadow-sm transition-all hover:shadow-md active:scale-[0.99]"
               >
-                <span className="text-xs text-muted-foreground">
-                  {formatSearchResultDate(result)}
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {formatSearchResultDate(result)}
+                  </span>
+                  {result.preacher?.trim() ? (
+                    <span className="inline-flex shrink-0 rounded-md bg-lime-100 px-2 py-0.5 text-[11px] font-semibold text-lime-800">
+                      {result.preacher.trim()} 목사
+                    </span>
+                  ) : null}
+                </div>
                 <h4 className="mt-1 text-base font-semibold text-foreground">
                   {result.title}
                 </h4>
