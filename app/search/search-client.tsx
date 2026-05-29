@@ -314,8 +314,8 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                     핵심 포인트- {result.matchedPointTitle}
                   </p>
                 ) : resultMode === "concern" ? (
-                  <p className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold leading-snug text-amber-700">
-                    ⭐ 전체 주제 일치
+                  <p className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium leading-snug text-amber-700">
+                    주제와 유사
                   </p>
                 ) : null}
                 {resultMode !== "concern" && result.keywords.length > 0 ? (
