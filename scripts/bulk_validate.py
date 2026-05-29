@@ -13,31 +13,54 @@ from ytdlp_auth import merge_ytdlp_auth_opts
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
 
-def yyymmdd_to_iso(code: str) -> str:
-    y = int(code[:2])
+def _valid_md(month: int, day: int) -> bool:
+    return 1 <= month <= 12 and 1 <= day <= 31
+
+
+def yyyymmdd_to_iso(code: str) -> str | None:
+    """8자리 YYYYMMDD(20210801) → YYYY-MM-DD. 유효한 날짜만 반환."""
+    year, month, day = int(code[:4]), int(code[4:6]), int(code[6:8])
+    if 2000 <= year <= 2099 and _valid_md(month, day):
+        return f"{code[:4]}-{code[4:6]}-{code[6:8]}"
+    return None
+
+
+def yyymmdd_to_iso(code: str) -> str | None:
+    """6자리 YYMMDD(240412) → YYYY-MM-DD. 유효한 날짜만 반환."""
+    y, month, day = int(code[:2]), int(code[2:4]), int(code[4:6])
     year = 2000 + y if y < 50 else 1900 + y
-    return f"{year}-{code[2:4]}-{code[4:6]}"
+    if _valid_md(month, day):
+        return f"{year}-{code[2:4]}-{code[4:6]}"
+    return None
 
 
 def parse_sermon_date_from_title(yt_title: str) -> str | None:
     """
-    유튜브 제목 어디에 있든 YYMMDD(240412 등) → YYYY-MM-DD.
-    제목 왼쪽·가운데·오른쪽 모두 re.findall로 처리.
+    유튜브 제목 속 날짜 → YYYY-MM-DD.
+    8자리 YYYYMMDD(20210801, 2021-08 이전 형식)를 6자리 YYMMDD(210808, 이후 형식)보다 먼저 본다.
+    (8자리를 6자리로 잘라 2020-21-08처럼 깨지던 버그 방지)
     """
     if not yt_title:
         return None
 
-    codes = re.findall(r"\d{6}", yt_title)
-    sermon_code = None
+    # 1) 8자리 YYYYMMDD 우선 (다른 숫자에 붙어 있지 않은 정확히 8자리만)
+    for code in re.findall(r"(?<!\d)\d{8}(?!\d)", yt_title):
+        iso = yyyymmdd_to_iso(code)
+        if iso:
+            return iso
+
+    # 2) 6자리 YYMMDD — 23~26으로 시작하는 코드 우선, 없으면 첫 유효 코드
+    codes = re.findall(r"(?<!\d)\d{6}(?!\d)", yt_title)
     for code in codes:
         if code.startswith(("23", "24", "25", "26")):
-            sermon_code = code
-            break
-    if not sermon_code and codes:
-        sermon_code = codes[0]
-    if not sermon_code:
-        return None
-    return yyymmdd_to_iso(sermon_code)
+            iso = yyymmdd_to_iso(code)
+            if iso:
+                return iso
+    for code in codes:
+        iso = yyymmdd_to_iso(code)
+        if iso:
+            return iso
+    return None
 
 
 def fetch_youtube_title(video_id: str) -> str | None:

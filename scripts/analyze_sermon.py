@@ -35,6 +35,53 @@ def _sleep_before_gemini(label: str) -> None:
     print(f"💤 [{label}] Gemini 호출 전 대기 {sleep_sec:.1f}초...")
     time.sleep(sleep_sec)
 
+
+# 503(과부하)·500(내부오류)·429(쿼터) 등 일시적 오류 자동 재시도
+GEMINI_MAX_RETRIES = int(_read_float_env("GEMINI_MAX_RETRIES", 3))
+GEMINI_RETRY_BASE_SEC = _read_float_env("GEMINI_RETRY_BASE_SEC", 30.0)
+_RETRYABLE_TOKENS = (
+    "503",
+    "500",
+    "429",
+    "unavailable",
+    "overloaded",
+    "internal",
+    "deadline",
+    "timeout",
+    "high demand",
+    "try again",
+)
+
+
+def _is_retryable_gemini_error(err: Exception) -> bool:
+    msg = str(err).lower()
+    return any(tok in msg for tok in _RETRYABLE_TOKENS)
+
+
+def _generate_with_retry(label: str, **kwargs):
+    """
+    client.models.generate_content 호출을 503/500/429 등 일시적 오류에 대해
+    지수 백오프(30→60→120초)로 최대 GEMINI_MAX_RETRIES회 재시도한다.
+    재시도 불가능한 오류는 즉시 올린다.
+    """
+    last_err: Exception | None = None
+    for attempt in range(1, GEMINI_MAX_RETRIES + 1):
+        try:
+            return client.models.generate_content(**kwargs)
+        except Exception as e:  # noqa: BLE001 - SDK 예외 종류가 다양해 메시지로 판별
+            last_err = e
+            if attempt >= GEMINI_MAX_RETRIES or not _is_retryable_gemini_error(e):
+                raise
+            wait_sec = GEMINI_RETRY_BASE_SEC * (2 ** (attempt - 1))
+            print(
+                f"⏳ [{label}] 일시적 오류 (시도 {attempt}/{GEMINI_MAX_RETRIES}): {e}\n"
+                f"   {wait_sec:.0f}초 대기 후 재시도합니다...",
+            )
+            time.sleep(wait_sec)
+    if last_err is not None:
+        raise last_err
+    raise RuntimeError("Gemini 호출 실패 (원인 불명)")
+
 # 스크립트 원문 타임스탬프 패턴: [05:44]
 TIMESTAMP_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2})\]")
 
@@ -185,13 +232,13 @@ def _build_json_prompt(
         "sermon_date": "설교가 전해진 날짜 YYYY-MM-DD. 자막 서두·제목·안내 문자에 날짜가 있으면 반드시 기재. 정말 전혀 없을 때만 빈 문자열",
         "core_bible_verse": "핵심 본문의 성경 참조만 (예: 누가복음 9:36). 본문 인용 금지",
         "keywords": ["핵심태그1", "핵심태그2", "핵심태그3", "부차태그4", "부차태그5", "부차태그6"],
-        "summary": "전체 내용을 3~4줄로 요약한 텍스트",
+        "summary": "성도에게 직접 전하는 핵심 메시지 3~4문장 (설교를 바깥에서 설명하지 말고 그 말씀을 선포하듯). 자세한 문체 규칙은 아래 참조",
         "points": [
             {{
                 "point_title": "대지 소제목 (서수 '첫째' 제외, 명사형)",
                 "start_time_text": "[05:44]",
                 "start_time_seconds": 344,
-                "description": "이 대지의 구조·논지 1~2줄 요약 (인용문·묵상문 아님)"
+                "description": "이 대지에서 성도에게 전하는 메시지 1~2줄 (설교 해설 아님, 인용문·묵상문도 아님). 문체는 아래 규칙"
             }}
         ],
         "grace_notes": [
@@ -228,7 +275,7 @@ def _build_json_prompt(
     [설교 포인트 points = 설교 지도]
     - 목적: 설교의 대지·흐름을 파악하는 목차/개요.
     - point_title: 해당 대지의 짧은 소제목(핵심 명사). "첫째, 둘째" 서수는 쓰지 마라.
-    - description: 그 대지에서 무엇을 말하는지 1~2줄로 요약. 보고서체·제3자 시점 금지.
+    - description: 그 대지의 메시지를 성도에게 직접 전하듯 1~2줄. 보고서체·제3자 시점 금지 (아래 문체 규칙 적용).
     - description에 설교 문장을 길게 인용하거나, grace_notes에 넣을 만한 감동 멘트를 통째로 넣지 마라.
     - 타임스탬프는 그 대지가 처음 시작되는 지점.
 
@@ -251,12 +298,34 @@ def _build_json_prompt(
     - 각 항목에 point_title, start_time_text, start_time_seconds, description을 모두 포함하세요.
     - 예전 필드명 start_time은 사용하지 마세요.
     
-    [말씀 요약(summary) 및 대지(description) 작성 시 절대 규칙]
-    - "본 설교는 ~를 다룹니다", "목회자는 ~라고 설명합니다", "~를 강조합니다" 같은 제3자 관점의 건조한 리포트나 보고서 형식을 절대 사용하지 마라.
-    - 사용자가 말씀을 읽고 바로 묵상과 기도를 할 수 있도록, 목사님이 성도들에게 직접 선포하는 듯한 은혜로운 문체(합시다, ~입니다 등)로 작성해라.
-    - 불필요한 서론은 다 자르고, 곧바로 말씀의 핵심과 성도들이 삶에 적용할 수 있는 결단 위주로 요약해라.
-    - (나쁜 예): "본 설교는 부모 공경이 축복의 통로임을 역설하며, 성도들에게 효도를 당부합니다. 이는 단순히 도덕적 행위를 넘어 하나님의 축복을 받는 통로임을 역설합니다."
-    - (좋은 예): "부모님은 하나님이 주신 축복의 통로입니다. 때로는 비합리적으로 보일지라도 부모님을 공경하는 것이 영적인 유익과 장수의 복으로 이어집니다. 사랑하는 성도 여러분, 효도할 기회를 놓치지 마시고 효도를 통해 축복을 받는 삶을 살아갑시다."
+    [★ summary(요약 카드)·points의 description 문체 — 절대 규칙 ★]
+    (이 규칙은 summary와 각 points.description 에만 적용된다. grace_notes·decision_prayer 에는 적용하지 마라.)
+
+    [핵심 원칙] 설교를 "바깥에서 설명·요약"하지 말고, 목사님이 성도에게 "직접 선포하듯" 말씀 자체를 전하라.
+
+    - 금지 1 (메타 주어): 문장의 주어로 "본 설교는 / 이 설교는 / 목사님은 / 설교자는 / 본문은 / ~이야기는 / ~비유는" 을 쓰지 마라.
+      주어는 성경 인물(예: 삭개오, 바디매오), 또는 "우리"·"저와 여러분", 또는 영적 진리 자체여야 한다.
+    - 금지 2 (보고 동사): 다음 서술어로 끝맺지 마라 — 강조합니다, 지적합니다, 설명합니다, 전합니다, 보여줍니다, 듭니다, 다룹니다, 당부합니다, 역설합니다, 제시합니다, 밝힙니다, 권면합니다.
+    - 금지 3 (명사화 보고체): "~중요성을 강조합니다", "~살 수 있음을 강조합니다", "~해야 함을 역설합니다" 처럼 "~음을/~함을/~임을 + (강조·설명·역설 등)" 으로 메시지를 감싸지 마라. 그 메시지를 그냥 직접 말하라.
+    - 금지 4 (첫 문장): 특히 첫 문장을 설교 해설("본 설교는 …", "삭개오의 이야기는 …을 보여줍니다")로 시작하지 마라. 곧바로 말씀·메시지로 들어가라.
+    - 불필요한 서론은 자르고, 말씀의 핵심과 성도가 삶에 적용할 결단 위주로 써라.
+
+    [다양성 요구 — 단조로워지지 않게]
+    - 시작을 매번 같은 형태로 하지 말고 번갈아 변주하라: (가) 비유·이미지, (나) 선언적 영적 진리, (다) 성경 인물의 행동·고백 서술.
+    - 맺음도 한 가지로 굳히지 말고 돌아가며 쓰라: "~합시다", "~되기를 바랍니다", "~되기를 축복합니다", "~나타나야 합니다", "~누리며 살아갑니다".
+    - 모든 항목을 "우리는 ~해야 합니다" 한 가지 틀로 시작·종결하지 마라.
+
+    [변환 예시 — 왼쪽(나쁨)을 오른쪽(좋음)처럼 고쳐라]
+    - (나쁨) "본 설교는 바디매오의 이야기를 통해 바른 믿음의 중요성을 강조합니다."
+      (좋음) "맹인 바디매오는 연약함 속에서도 '다윗의 자손 예수여 나를 불쌍히 여기소서' 부르짖었습니다. 그 간절한 믿음이 그를 살렸습니다. 우리의 믿음도 막연한 지식이 아니라 삶의 변화로 나타나야 합니다."
+    - (나쁨) "삭개오의 이야기는 우리에게 기회를 붙잡는 삶의 중요성을 보여줍니다."
+      (좋음) "삭개오는 예수님을 만나려 핑계 대지 않고 나무 위로 올라갔습니다. 예수님이 다가오실 때 적극적으로 나아갈 때, 우리 삶에도 획기적인 변화가 찾아옵니다. 지금의 기회를 놓치지 마시기 바랍니다."
+    - (나쁨) "목사님은 마귀가 좋아하는 사람의 특징으로 욕심과 교만을 듭니다."
+      (좋음) "마귀는 욕심내고 회개하지 않는 마음을 좋아합니다. 우리는 날마다 회개하며 정직한 심령으로 승리하는 성도가 됩시다."
+
+    [좋은 예 — 이미 잘 된 형태]
+    - "삶은 흔들리지만 뽑히지 않는 나무와 같습니다. 어려운 순간일수록 하나님께 기도하며, 흔들림 속에서도 견고한 믿음으로 하나님 나라를 이루어 갑시다."
+    - "부모님은 하나님이 주신 축복의 통로입니다. 효도할 기회를 놓치지 마시고, 그 순종을 통해 영적 유익과 장수의 복을 누리며 살아갑시다."
     
     [★ grace_notes (은혜의 조각들) — points·결단 기도와 중복 금지 ★]
     설교 **중반·전반**에서 points·decision_prayer에 실리지 않은 별도 영적 깨달음 구간만 골라라.
@@ -780,7 +849,8 @@ def analyze_sermon(
 
     try:
         _sleep_before_gemini("플랜 A")
-        response = client.models.generate_content(
+        response = _generate_with_retry(
+            "플랜 A",
             model=MODEL_NAME,
             contents=prompt,
         )
@@ -822,7 +892,8 @@ def analyze_sermon_from_audio(
             from_audio=True, expected_sermon_date=expected_sermon_date
         )
         _sleep_before_gemini("플랜 B")
-        response = client.models.generate_content(
+        response = _generate_with_retry(
+            "플랜 B",
             model=MODEL_NAME,
             contents=[uploaded_file, prompt],
         )

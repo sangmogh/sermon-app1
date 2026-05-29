@@ -29,6 +29,13 @@ from pathlib import Path
 
 import requests
 
+# Windows 기본 콘솔(cp949)에서 한글·특수문자(—) 출력 시 크래시 방지
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from project_env import PROJECT_ROOT, load_supabase_env

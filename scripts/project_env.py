@@ -21,16 +21,16 @@ ENV_AI = PROJECT_ROOT / ".env"
 def load_supabase_env() -> Path:
     """DB/Supabase 스크립트용 — .env.local 만 로드."""
     if ENV_LOCAL.is_file():
-        load_dotenv(ENV_LOCAL, override=True)
+        load_dotenv(ENV_LOCAL, override=True, encoding="utf-8-sig")
     return PROJECT_ROOT
 
 
 def load_ai_env() -> Path:
     """AI 분석 스크립트용 — .env.local 후 .env (Gemini 키)."""
     if ENV_LOCAL.is_file():
-        load_dotenv(ENV_LOCAL, override=False)
+        load_dotenv(ENV_LOCAL, override=False, encoding="utf-8-sig")
     if ENV_AI.is_file():
-        load_dotenv(ENV_AI, override=True)
+        load_dotenv(ENV_AI, override=True, encoding="utf-8-sig")
     return PROJECT_ROOT
 
 
