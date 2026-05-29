@@ -1,8 +1,5 @@
 import type { Sermon } from "@/lib/supabase";
 
-/** "오늘의 말씀" 풀에서 제외할 연도 (해당 연도 설교는 추천하지 않음) */
-const EXCLUDED_YEARS = new Set(["2026"]);
-
 /** 한국 시간(KST) 기준 오늘 날짜 키 (자정마다 추천 설교가 바뀜) */
 export function getKstDayKey(date = new Date()): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -50,20 +47,24 @@ function seededShuffle<T>(items: T[], seed: number): T[] {
 
 /**
  * 겹침 없는 일일 순환 추천.
- * - 2026년 설교는 풀에서 제외
+ * - "진행 중인 올해"(KST 현재 연도) 설교는 풀에서 제외 → 매년 1/1에 지난 해가 자동 합류
+ *   (예: 2026년엔 2026 제외 / 2027년이 되면 2026이 풀에 들어오고 2027이 제외)
  * - 풀을 시드로 섞은 뒤 하루에 하나씩 → 풀을 한 바퀴 다 돌 때까지 중복 없음
  * - 한 바퀴(=풀 크기 일수)가 끝나면 새 시드로 다시 섞어 같은 풀에서 또 순환
  * - 날짜 기반 결정론이라 "하루 고정 + 매일 변경 + 모두에게 동일" 유지
  */
 export function pickTodaySermon(sermons: Sermon[]): Sermon | null {
-  const pool = sermons.filter((sermon) => {
-    const year = (sermon.sermon_date ?? "").slice(0, 4);
-    return !EXCLUDED_YEARS.has(year);
-  });
-
-  if (pool.length === 0) {
+  if (sermons.length === 0) {
     return null;
   }
+
+  const currentYear = getKstDayKey().slice(0, 4);
+  const pastYearPool = sermons.filter(
+    (sermon) => (sermon.sermon_date ?? "").slice(0, 4) !== currentYear,
+  );
+
+  // 지난 해 설교가 하나도 없을 때만(초기 등) 전체로 폴백 → 홈이 비지 않게
+  const pool = pastYearPool.length > 0 ? pastYearPool : sermons;
 
   // DB 반환 순서에 흔들리지 않도록 id 기준 고정 정렬 후 섞는다.
   const ordered = [...pool].sort((a, b) => a.id.localeCompare(b.id));
