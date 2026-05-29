@@ -1,4 +1,5 @@
 const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
+const DEFAULT_EMBEDDING_DIM = 768;
 
 function readGeminiApiKey(): string {
   const key = (
@@ -18,6 +19,12 @@ export function readEmbeddingModel(): string {
   return (
     process.env.GEMINI_EMBEDDING_MODEL ?? ""
   ).trim() || DEFAULT_EMBEDDING_MODEL;
+}
+
+/** 인덱스(문서) 임베딩과 동일해야 하는 출력 차원 */
+export function readEmbeddingDim(): number {
+  const raw = Number.parseInt((process.env.GEMINI_EMBEDDING_DIM ?? "").trim(), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_EMBEDDING_DIM;
 }
 
 type EmbedContentResponse = {
@@ -41,6 +48,8 @@ export async function embedText(text: string): Promise<number[]> {
     body: JSON.stringify({
       model: `models/${model}`,
       content: { parts: [{ text: trimmed }] },
+      taskType: "RETRIEVAL_QUERY",
+      outputDimensionality: readEmbeddingDim(),
     }),
   });
 

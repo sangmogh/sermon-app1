@@ -10,8 +10,12 @@ import type { SearchResultSermon } from "@/lib/search";
 
 /** 임베딩 검색 상위 N (고민 문장) */
 const EMBEDDING_TOP_K = 20;
-/** 이보다 낮으면 제외 (노이즈 컷) */
-const EMBEDDING_MIN_SCORE = 0.2;
+/**
+ * 이보다 낮으면 제외 (노이즈 컷).
+ * gemini-embedding-001은 같은 도메인(설교) 텍스트끼리 코사인이 0.5+로 높게 뭉치므로,
+ * 실제 신앙 고민(상위 매칭 0.6+)은 살리고 명백히 무관한 질문만 걸러내는 값.
+ */
+const EMBEDDING_MIN_SCORE = 0.55;
 
 const SERMON_SELECT =
   "id, title, core_bible_verse, keywords, summary, sermon_date, created_at";
@@ -335,12 +339,22 @@ async function searchSermonsByEmbedding(
   const byId = new Map(all.map((sermon) => [sermon.id, sermon]));
   const queryVector = await embedText(query);
 
-  const ranked = index.entries
-    .map((entry) => ({
-      id: entry.id,
-      score: cosineSimilarity(queryVector, entry.embedding),
-    }))
-    .filter((row) => byId.has(row.id) && row.score >= EMBEDDING_MIN_SCORE)
+  // 멀티 벡터: 한 설교가 가진 여러 벡터(요약 + 포인트들) 중 최고 유사도를 그 설교 점수로 사용
+  const bestScoreById = new Map<string, number>();
+  for (const entry of index.entries) {
+    if (!byId.has(entry.id)) {
+      continue;
+    }
+    const score = cosineSimilarity(queryVector, entry.embedding);
+    const prev = bestScoreById.get(entry.id);
+    if (prev === undefined || score > prev) {
+      bestScoreById.set(entry.id, score);
+    }
+  }
+
+  const ranked = Array.from(bestScoreById.entries())
+    .map(([id, score]) => ({ id, score }))
+    .filter((row) => row.score >= EMBEDDING_MIN_SCORE)
     .sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;

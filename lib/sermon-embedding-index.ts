@@ -4,13 +4,18 @@ import path from "node:path";
 import type { SearchResultSermon } from "@/lib/search";
 
 export type SermonEmbeddingEntry = {
+  /** 설교 id (멀티 벡터에서는 같은 id가 여러 엔트리에 등장) */
   id: string;
+  /** 벡터 종류: 설교 요약 또는 개별 설교 포인트 */
+  kind?: "summary" | "point";
   embedding: number[];
 };
 
 export type SermonEmbeddingIndex = {
-  version: 1;
+  version: 2;
   model: string;
+  /** 출력 차원 (검색 쿼리 임베딩과 일치해야 함) */
+  dim?: number;
   updatedAt: string;
   entries: SermonEmbeddingEntry[];
 };
@@ -52,7 +57,7 @@ export async function loadSermonEmbeddingIndex(): Promise<SermonEmbeddingIndex |
     const raw = await readFile(sermonEmbeddingIndexPath(), "utf8");
     const parsed = JSON.parse(raw) as SermonEmbeddingIndex;
     if (
-      parsed?.version === 1 &&
+      parsed?.version === 2 &&
       Array.isArray(parsed.entries) &&
       parsed.entries.length > 0
     ) {

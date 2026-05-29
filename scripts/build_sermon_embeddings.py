@@ -1,8 +1,14 @@
 """
-Supabase 설교 → Gemini 임베딩 인덱스 (고민 검색용).
+Supabase 설교 → Gemini 멀티 벡터 임베딩 인덱스 (고민 검색용).
 
   python scripts/build_sermon_embeddings.py
 
+설교 1편당:
+  - 요약 벡터 1개  (제목 + 요약 + 키워드)
+  - 포인트 벡터 N개 (설교제목 + 포인트제목 + 포인트내용)
+검색 시 한 설교의 벡터들 중 가장 높은 유사도(MAX)를 그 설교 점수로 사용합니다.
+
+문서(설교) 임베딩은 taskType=RETRIEVAL_DOCUMENT, 출력 차원은 GEMINI_EMBEDDING_DIM(기본 768).
 upload_to_db.py 이후, 설교가 추가·갱신될 때마다 다시 실행하세요.
 """
 
@@ -24,9 +30,11 @@ from project_env import PROJECT_ROOT, load_project_env
 load_project_env()
 
 EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001").strip()
+EMBEDDING_DIM = int((os.getenv("GEMINI_EMBEDDING_DIM") or "768").strip())
 INDEX_PATH = PROJECT_ROOT / "data" / "sermon-embeddings.json"
 BATCH_SIZE = 100
 SLEEP_SEC = 0.3
+DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT"
 
 
 def _api_key() -> str:
@@ -47,7 +55,7 @@ def _supabase_rows() -> list[dict]:
         f"{url}/rest/v1/sermons",
         headers=headers,
         params={
-            "select": "id,title,core_bible_verse,summary,keywords",
+            "select": "id,title,core_bible_verse,summary,keywords,points",
             "order": "sermon_date.desc",
         },
         timeout=60,
@@ -70,12 +78,25 @@ def _parse_keywords(raw: object) -> list[str]:
     return []
 
 
-def _embedding_text(row: dict) -> str:
+def _parse_points(raw: object) -> list[dict]:
+    data = raw
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(data, list):
+        return []
+    points: list[dict] = []
+    for item in data:
+        if isinstance(item, dict):
+            points.append(item)
+    return points
+
+
+def _summary_text(row: dict) -> str:
     title = (row.get("title") or "").strip() or "제목 없음"
     lines = [f"제목: {title}"]
-    verse = (row.get("core_bible_verse") or "").strip()
-    if verse:
-        lines.append(f"핵심말씀: {verse}")
     summary = (row.get("summary") or "").strip()
     if summary:
         lines.append(f"요약: {summary}")
@@ -83,6 +104,48 @@ def _embedding_text(row: dict) -> str:
     if kws:
         lines.append(f"키워드: {', '.join(kws)}")
     return "\n".join(lines)
+
+
+def _point_text(row: dict, point: dict) -> str:
+    title = (row.get("title") or "").strip() or "제목 없음"
+    point_title = ""
+    for key in ("point_title", "pointTitle", "title", "name"):
+        value = point.get(key)
+        if isinstance(value, str) and value.strip():
+            point_title = value.strip()
+            break
+    description = ""
+    for key in ("description", "desc", "summary", "content", "text"):
+        value = point.get(key)
+        if isinstance(value, str) and value.strip():
+            description = value.strip()
+            break
+
+    lines = [f"제목: {title}"]
+    if point_title:
+        lines.append(f"포인트: {point_title}")
+    if description:
+        lines.append(f"내용: {description}")
+    return "\n".join(lines)
+
+
+def _build_units(rows: list[dict]) -> list[dict]:
+    """플랫한 임베딩 단위 목록: {id, kind, text}."""
+    units: list[dict] = []
+    for row in rows:
+        vid = str(row.get("id") or "").strip()
+        if not vid:
+            continue
+
+        units.append({"id": vid, "kind": "summary", "text": _summary_text(row)})
+
+        for point in _parse_points(row.get("points")):
+            text = _point_text(row, point)
+            # 제목만 있고 포인트/내용이 비면 요약과 중복이라 건너뜀
+            if "\n" not in text:
+                continue
+            units.append({"id": vid, "kind": "point", "text": text})
+    return units
 
 
 def _embed_batch(texts: list[str], api_key: str) -> list[list[float]]:
@@ -95,6 +158,8 @@ def _embed_batch(texts: list[str], api_key: str) -> list[list[float]]:
             {
                 "model": f"models/{EMBEDDING_MODEL}",
                 "content": {"parts": [{"text": text}]},
+                "taskType": DOCUMENT_TASK_TYPE,
+                "outputDimensionality": EMBEDDING_DIM,
             }
             for text in texts
         ]
@@ -123,25 +188,32 @@ def main() -> None:
         print("[WARN] 설교가 없습니다.")
         return
 
-    print(f"[INFO] 설교 {len(rows)}개 임베딩 시작 (model={EMBEDDING_MODEL})")
+    units = _build_units(rows)
+    summary_count = sum(1 for u in units if u["kind"] == "summary")
+    point_count = sum(1 for u in units if u["kind"] == "point")
+    print(
+        f"[INFO] 설교 {len(rows)}개 → 벡터 {len(units)}개 "
+        f"(요약 {summary_count} + 포인트 {point_count}), "
+        f"model={EMBEDDING_MODEL}, dim={EMBEDDING_DIM}"
+    )
 
     entries: list[dict] = []
-    for start in range(0, len(rows), BATCH_SIZE):
-        chunk = rows[start : start + BATCH_SIZE]
-        texts = [_embedding_text(r) for r in chunk]
+    for start in range(0, len(units), BATCH_SIZE):
+        chunk = units[start : start + BATCH_SIZE]
+        texts = [u["text"] for u in chunk]
         vectors = _embed_batch(texts, api_key)
-        for row, vector in zip(chunk, vectors):
-            vid = str(row.get("id") or "").strip()
-            if not vid:
-                continue
-            entries.append({"id": vid, "embedding": vector})
-        print(f"  … {min(start + len(chunk), len(rows))}/{len(rows)}")
+        for unit, vector in zip(chunk, vectors):
+            entries.append(
+                {"id": unit["id"], "kind": unit["kind"], "embedding": vector}
+            )
+        print(f"  … {min(start + len(chunk), len(units))}/{len(units)}")
         time.sleep(SLEEP_SEC)
 
     INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
     index = {
-        "version": 1,
+        "version": 2,
         "model": EMBEDDING_MODEL,
+        "dim": EMBEDDING_DIM,
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "entries": entries,
     }
@@ -149,7 +221,7 @@ def main() -> None:
         json.dumps(index, ensure_ascii=False),
         encoding="utf-8",
     )
-    print(f"[OK] 저장: {INDEX_PATH} ({len(entries)}개)")
+    print(f"[OK] 저장: {INDEX_PATH} ({len(entries)}개 벡터)")
 
 
 if __name__ == "__main__":
