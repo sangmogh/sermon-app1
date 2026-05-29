@@ -306,6 +306,11 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                 <p className="mt-1 text-sm text-muted-foreground">
                   {result.core_bible_verse}
                 </p>
+                {result.matchedPointTitle ? (
+                  <p className="mt-2 inline-flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-medium leading-snug text-rose-700">
+                    관련 포인트 · {result.matchedPointTitle}
+                  </p>
+                ) : null}
                 {result.keywords.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {result.keywords.slice(0, 4).map((keyword, idx) => (

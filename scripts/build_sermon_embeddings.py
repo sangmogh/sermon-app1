@@ -106,14 +106,17 @@ def _summary_text(row: dict) -> str:
     return "\n".join(lines)
 
 
-def _point_text(row: dict, point: dict) -> str:
-    title = (row.get("title") or "").strip() or "제목 없음"
-    point_title = ""
+def _point_title(point: dict) -> str:
     for key in ("point_title", "pointTitle", "title", "name"):
         value = point.get(key)
         if isinstance(value, str) and value.strip():
-            point_title = value.strip()
-            break
+            return value.strip()
+    return ""
+
+
+def _point_text(row: dict, point: dict) -> str:
+    title = (row.get("title") or "").strip() or "제목 없음"
+    point_title = _point_title(point)
     description = ""
     for key in ("description", "desc", "summary", "content", "text"):
         value = point.get(key)
@@ -144,7 +147,14 @@ def _build_units(rows: list[dict]) -> list[dict]:
             # 제목만 있고 포인트/내용이 비면 요약과 중복이라 건너뜀
             if "\n" not in text:
                 continue
-            units.append({"id": vid, "kind": "point", "text": text})
+            units.append(
+                {
+                    "id": vid,
+                    "kind": "point",
+                    "text": text,
+                    "label": _point_title(point),
+                }
+            )
     return units
 
 
@@ -203,9 +213,11 @@ def main() -> None:
         texts = [u["text"] for u in chunk]
         vectors = _embed_batch(texts, api_key)
         for unit, vector in zip(chunk, vectors):
-            entries.append(
-                {"id": unit["id"], "kind": unit["kind"], "embedding": vector}
-            )
+            entry = {"id": unit["id"], "kind": unit["kind"], "embedding": vector}
+            label = unit.get("label")
+            if label:
+                entry["label"] = label
+            entries.append(entry)
         print(f"  … {min(start + len(chunk), len(units))}/{len(units)}")
         time.sleep(SLEEP_SEC)
 

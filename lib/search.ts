@@ -10,6 +10,8 @@ export type SearchResultSermon = {
   keywords: string[];
   summary?: string;
   sermon_date?: string | null;
+  /** 고민(임베딩) 검색에서 이 설교를 끌어올린 포인트 제목 (요약 매칭이면 없음) */
+  matchedPointTitle?: string;
 };
 
 export const POPULAR_TAGS = ["위로", "결단", "가족", "사명", "믿음"] as const;

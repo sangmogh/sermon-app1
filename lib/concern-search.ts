@@ -339,21 +339,26 @@ async function searchSermonsByEmbedding(
   const byId = new Map(all.map((sermon) => [sermon.id, sermon]));
   const queryVector = await embedText(query);
 
-  // 멀티 벡터: 한 설교가 가진 여러 벡터(요약 + 포인트들) 중 최고 유사도를 그 설교 점수로 사용
-  const bestScoreById = new Map<string, number>();
+  // 멀티 벡터: 한 설교가 가진 여러 벡터(요약 + 포인트들) 중 최고 유사도를 그 설교 점수로 사용.
+  // 최고점을 만든 벡터가 "포인트"면 그 포인트 제목을 함께 기억해 결과 카드에 보여준다.
+  type BestMatch = { score: number; pointTitle?: string };
+  const bestById = new Map<string, BestMatch>();
   for (const entry of index.entries) {
     if (!byId.has(entry.id)) {
       continue;
     }
     const score = cosineSimilarity(queryVector, entry.embedding);
-    const prev = bestScoreById.get(entry.id);
-    if (prev === undefined || score > prev) {
-      bestScoreById.set(entry.id, score);
+    const prev = bestById.get(entry.id);
+    if (prev === undefined || score > prev.score) {
+      bestById.set(entry.id, {
+        score,
+        pointTitle: entry.kind === "point" ? entry.label : undefined,
+      });
     }
   }
 
-  const ranked = Array.from(bestScoreById.entries())
-    .map(([id, score]) => ({ id, score }))
+  const ranked = Array.from(bestById.entries())
+    .map(([id, best]) => ({ id, ...best }))
     .filter((row) => row.score >= EMBEDDING_MIN_SCORE)
     .sort((a, b) => {
       if (b.score !== a.score) {
@@ -370,7 +375,15 @@ async function searchSermonsByEmbedding(
   }
 
   return ranked
-    .map((row) => byId.get(row.id))
+    .map((row) => {
+      const sermon = byId.get(row.id);
+      if (!sermon) {
+        return undefined;
+      }
+      return row.pointTitle
+        ? { ...sermon, matchedPointTitle: row.pointTitle }
+        : sermon;
+    })
     .filter((sermon): sermon is SearchResultSermon => sermon !== undefined);
 }
 

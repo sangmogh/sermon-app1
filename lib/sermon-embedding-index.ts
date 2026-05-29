@@ -8,6 +8,8 @@ export type SermonEmbeddingEntry = {
   id: string;
   /** 벡터 종류: 설교 요약 또는 개별 설교 포인트 */
   kind?: "summary" | "point";
+  /** 포인트 벡터일 때 해당 포인트 제목 (결과 카드에 "관련 포인트"로 표시) */
+  label?: string;
   embedding: number[];
 };
 
