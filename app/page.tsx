@@ -7,12 +7,14 @@ import { PageShell } from "@/components/page-layout";
 import { PageHeader } from "@/components/page-header";
 import { PwaInstallCard } from "@/components/pwa-install-card";
 
-export const dynamic = "force-dynamic";
+// "오늘의 말씀"은 KST 자정에만 바뀌므로 매 요청마다 새로 만들 필요가 없다.
+// 1시간 단위로 캐시(ISR)해서 앱을 켤 때마다 하던 Supabase 왕복을 없앤다.
+export const revalidate = 3600;
 
 export default async function HomePage() {
   const { data, error } = await getSupabase()
     .from("sermons")
-    .select("*")
+    .select("id, title, core_bible_verse, sermon_date")
     .order("sermon_date", { ascending: false, nullsFirst: false });
 
   if (error) {
