@@ -63,6 +63,24 @@ def parse_sermon_date_from_title(yt_title: str) -> str | None:
     return None
 
 
+# 제목 속 설교자: "... | 박근진 목사", "박근진목사님" 등 → 이름만
+PREACHER_PATTERN = re.compile(r"([가-힣]{2,4})\s*목사(?:님)?")
+
+
+def parse_preacher_from_title(yt_title: str) -> str | None:
+    """
+    유튜브 제목에서 '○○○ 목사' 형태의 설교자 이름만 추출.
+    예: '(새벽기도회) 생명나무교회 | 260529 "네가 무엇이든지" | 박근진 목사' → '박근진'
+    여러 번 나오면 마지막(보통 제목 끝의 설교자)을 사용. 없으면 None.
+    """
+    if not yt_title:
+        return None
+    matches = PREACHER_PATTERN.findall(yt_title)
+    if matches:
+        return matches[-1].strip()
+    return None
+
+
 def fetch_youtube_title(video_id: str) -> str | None:
     url = f"https://www.youtube.com/watch?v={video_id}"
     try:

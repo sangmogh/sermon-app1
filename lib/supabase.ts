@@ -28,6 +28,10 @@ export type Sermon = {
   grace_notes?: GraceNote[] | null;
   decision_prayer?: DecisionPrayer | null;
   sermon_date?: string | null;
+  /** 예배 종류: "주일" / "새벽" / "청년" 등. NULL·빈값은 주일(메인)로 취급 */
+  service_type?: string | null;
+  /** 설교자 이름 (새벽·청년처럼 매번 다를 수 있음) */
+  preacher?: string | null;
   created_at: string;
 };
 

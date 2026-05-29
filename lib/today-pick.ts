@@ -1,4 +1,5 @@
 import type { Sermon } from "@/lib/supabase";
+import { isMainSermon } from "@/lib/service-type";
 
 /** 한국 시간(KST) 기준 오늘 날짜 키 (자정마다 추천 설교가 바뀜) */
 export function getKstDayKey(date = new Date()): string {
@@ -58,13 +59,21 @@ export function pickTodaySermon(sermons: Sermon[]): Sermon | null {
     return null;
   }
 
+  // 오늘의 말씀은 주일(담임목사) 설교만 — 새벽·청년은 추천 풀에서 제외
+  const mainSermons = sermons.filter((sermon) =>
+    isMainSermon(sermon.service_type),
+  );
+  if (mainSermons.length === 0) {
+    return null;
+  }
+
   const currentYear = getKstDayKey().slice(0, 4);
-  const pastYearPool = sermons.filter(
+  const pastYearPool = mainSermons.filter(
     (sermon) => (sermon.sermon_date ?? "").slice(0, 4) !== currentYear,
   );
 
-  // 지난 해 설교가 하나도 없을 때만(초기 등) 전체로 폴백 → 홈이 비지 않게
-  const pool = pastYearPool.length > 0 ? pastYearPool : sermons;
+  // 지난 해 설교가 하나도 없을 때만(초기 등) 주일 전체로 폴백 → 홈이 비지 않게
+  const pool = pastYearPool.length > 0 ? pastYearPool : mainSermons;
 
   // DB 반환 순서에 흔들리지 않도록 id 기준 고정 정렬 후 섞는다.
   const ordered = [...pool].sort((a, b) => a.id.localeCompare(b.id));

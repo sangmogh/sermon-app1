@@ -13,11 +13,14 @@ import { parseKeywords } from "@/lib/sermon-parse";
 type ArchiveMonthListProps = {
   sermons: Sermon[];
   emptyMessage?: string;
+  /** 날짜 옆에 'OOO 목사' 연두색 배지 표시 (새벽·청년 보관함용) */
+  showPreacher?: boolean;
 };
 
 export function ArchiveMonthList({
   sermons,
   emptyMessage = "이 연도에 보관된 설교가 없습니다.",
+  showPreacher = false,
 }: ArchiveMonthListProps) {
   const monthGroups = groupSermonsByMonth(sermons);
 
@@ -49,6 +52,10 @@ export function ArchiveMonthList({
               const monthShort = formatSermonMonthShort(sermon);
               const dateLabel = formatSermonDateLabel(sermon);
               const showDate = hasValidSermonDate(sermon);
+              const preacher =
+                typeof sermon.preacher === "string"
+                  ? sermon.preacher.trim()
+                  : "";
 
               return (
                 <Link
@@ -70,11 +77,18 @@ export function ArchiveMonthList({
                   ) : null}
 
                   <div className="min-w-0 flex-1">
-                    {showDate ? (
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {dateLabel}
-                      </span>
-                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {showDate ? (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {dateLabel}
+                        </span>
+                      ) : null}
+                      {showPreacher && preacher ? (
+                        <span className="inline-flex shrink-0 rounded-md bg-lime-100 px-2 py-0.5 text-[11px] font-semibold text-lime-800">
+                          {preacher} 목사
+                        </span>
+                      ) : null}
+                    </div>
                     <h3 className="mt-1 text-base font-semibold text-foreground">
                       {sermon.title}
                     </h3>

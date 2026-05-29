@@ -26,7 +26,11 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from analyze_sermon import analyze_sermon, analyze_sermon_from_audio
 from audio_downloader import download_audio_m4a
-from bulk_validate import parse_sermon_date_from_title, validate_saved_json
+from bulk_validate import (
+    parse_preacher_from_title,
+    parse_sermon_date_from_title,
+    validate_saved_json,
+)
 from extract_subtitles import extract_video_id, get_clean_transcript
 from ytdlp_auth import merge_ytdlp_auth_opts, ytdlp_auth_status_line
 
@@ -106,15 +110,23 @@ def process_single_video(
     total: int,
     *,
     youtube_title: str | None = None,
+    service_type: str | None = None,
+    preacher: str | None = None,
 ) -> tuple[bool, bool]:
     """
     한 영상 처리. (성공 여부, 이미 분석됨 스킵 여부) 반환. 내부 예외는 모두 처리.
+    service_type/preacher 는 소스(재생목록)에서 넘어와 JSON에 그대로 기록된다.
     """
     print(f"\n▶️ [{index}/{total}] 처리 시작: {video_id}")
 
     expected_date = parse_sermon_date_from_title(youtube_title or "")
     if expected_date:
         print(f"📅 [{index}/{total}] 유튜브 제목 설교일: {expected_date}")
+
+    # 설교자: 명시 지정이 없으면 유튜브 제목의 '○○○ 목사'에서 추출
+    resolved_preacher = preacher or parse_preacher_from_title(youtube_title or "")
+    if resolved_preacher:
+        print(f"🎙️ [{index}/{total}] 설교자: {resolved_preacher}")
 
     if _should_skip_video(video_id, index, total):
         return True, True
@@ -124,7 +136,12 @@ def process_single_video(
         transcript_path = get_clean_transcript(video_url)
         if transcript_path:
             file_name = os.path.basename(transcript_path)
-            if analyze_sermon(file_name, expected_sermon_date=expected_date):
+            if analyze_sermon(
+                file_name,
+                expected_sermon_date=expected_date,
+                service_type=service_type,
+                preacher=resolved_preacher,
+            ):
                 if validate_saved_json(video_id):
                     print(f"✅ [{index}/{total}] 플랜 A 완료: {video_id}")
                     return True, False
@@ -150,7 +167,11 @@ def process_single_video(
                 return False, False
 
             if not analyze_sermon_from_audio(
-                video_id, audio_path, expected_sermon_date=expected_date
+                video_id,
+                audio_path,
+                expected_sermon_date=expected_date,
+                service_type=service_type,
+                preacher=resolved_preacher,
             ):
                 print(f"❌ [{index}/{total}] 플랜 B 분석 실패: {video_id}")
                 return False, False
@@ -177,7 +198,15 @@ def process_single_video(
     return False, False
 
 
-def process_playlist(playlist_url: str, *, limit: int | None = None) -> None:
+def process_playlist(
+    playlist_url: str,
+    *,
+    limit: int | None = None,
+    service_type: str | None = None,
+    preacher: str | None = None,
+) -> None:
+    if service_type:
+        print(f"🏷️ 예배 종류(service_type) = {service_type}")
     print("👀 재생목록 정보를 가져오는 중입니다...")
 
     ydl_opts = merge_ytdlp_auth_opts(
@@ -215,7 +244,13 @@ def process_playlist(playlist_url: str, *, limit: int | None = None) -> None:
             video_url, video_id = _resolve_entry(entry)
             print(f"📺 [{index}/{total_videos}] {title}")
             ok, skipped = process_single_video(
-                video_url, video_id, index, total_videos, youtube_title=title
+                video_url,
+                video_id,
+                index,
+                total_videos,
+                youtube_title=title,
+                service_type=service_type,
+                preacher=preacher,
             )
             if ok:
                 success_count += 1

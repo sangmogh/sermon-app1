@@ -51,15 +51,21 @@ def _supabase_rows() -> list[dict]:
         raise SystemExit("[ERROR] Supabase URL/KEY 가 필요합니다.")
 
     headers = {"apikey": key, "Authorization": f"Bearer {key}"}
-    response = requests.get(
-        f"{url}/rest/v1/sermons",
-        headers=headers,
-        params={
-            "select": "id,title,core_bible_verse,summary,keywords,points",
-            "order": "sermon_date.desc",
-        },
-        timeout=60,
-    )
+
+    def _query(select: str) -> requests.Response:
+        return requests.get(
+            f"{url}/rest/v1/sermons",
+            headers=headers,
+            params={"select": select, "order": "sermon_date.desc"},
+            timeout=60,
+        )
+
+    # service_type 포함 조회. 컬럼 미존재(마이그레이션 전)면 빼고 재조회 → 전부 주일 취급.
+    response = _query("id,title,core_bible_verse,summary,keywords,points,service_type")
+    if response.status_code != 200 and "service_type" in response.text:
+        print("[INFO] service_type 컬럼 없음 → 모든 설교를 멀티벡터(주일)로 처리합니다.")
+        response = _query("id,title,core_bible_verse,summary,keywords,points")
+
     if response.status_code != 200:
         raise SystemExit(f"[ERROR] Supabase 조회 실패: {response.status_code} {response.text[:200]}")
     return response.json()
@@ -132,8 +138,21 @@ def _point_text(row: dict, point: dict) -> str:
     return "\n".join(lines)
 
 
+MAIN_SERVICE_TYPE = "주일"
+
+
+def _is_main_service(row: dict) -> bool:
+    """주일(메인) 설교 여부. service_type 비어 있으면(기존 데이터) 주일로 취급."""
+    service_type = str(row.get("service_type") or "").strip()
+    return service_type == "" or service_type == MAIN_SERVICE_TYPE
+
+
 def _build_units(rows: list[dict]) -> list[dict]:
-    """플랫한 임베딩 단위 목록: {id, kind, text}."""
+    """
+    플랫한 임베딩 단위 목록: {id, kind, text}.
+    - 주일(메인): 요약 벡터 + 포인트 벡터들 (멀티벡터)
+    - 그 외(새벽·청년 등): 요약 벡터 1개만 (인덱스 폭증 방지 + 주제 매칭 위주)
+    """
     units: list[dict] = []
     for row in rows:
         vid = str(row.get("id") or "").strip()
@@ -141,6 +160,10 @@ def _build_units(rows: list[dict]) -> list[dict]:
             continue
 
         units.append({"id": vid, "kind": "summary", "text": _summary_text(row)})
+
+        if not _is_main_service(row):
+            # 새벽·청년 등은 요약벡터만 — 포인트 벡터 생성 생략
+            continue
 
         for point in _parse_points(row.get("points")):
             text = _point_text(row, point)

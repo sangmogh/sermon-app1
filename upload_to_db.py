@@ -34,6 +34,15 @@ output_dir = PROJECT_ROOT / "output"
 MIGRATION_SQL = (
     PROJECT_ROOT / "supabase" / "migrations" / "20260526000000_add_decision_prayer.sql"
 )
+SERVICE_META_MIGRATION_SQL = (
+    PROJECT_ROOT
+    / "supabase"
+    / "migrations"
+    / "20260529120000_add_service_type_preacher.sql"
+)
+
+# DB에 없을 수 있는 선택 컬럼들 (없으면 자동으로 제외하고 업로드)
+OPTIONAL_COLUMNS = ("decision_prayer", "service_type", "preacher")
 
 
 def _unwrap_list(raw: object) -> list:
@@ -175,11 +184,12 @@ def build_row(
     video_id: str,
     data: dict,
     *,
-    include_decision_prayer: bool,
+    available: set[str],
 ) -> dict:
     """
     upsert payload. JSON에 sermon_date가 비어 있으면 필드를 넣지 않아
     DB에 이미 채워 둔 날짜(fix_dates.py)가 null로 덮이지 않게 한다.
+    available: DB에 실제로 존재하는 선택 컬럼 집합 (없는 컬럼은 payload에서 제외).
     """
     row: dict = {
         "id": video_id,
@@ -191,10 +201,21 @@ def build_row(
         "grace_notes": normalize_grace_notes(data.get("grace_notes")),
     }
 
-    if include_decision_prayer:
+    if "decision_prayer" in available:
         decision_prayer = normalize_decision_prayer(data.get("decision_prayer"))
         if decision_prayer:
             row["decision_prayer"] = decision_prayer
+
+    # service_type / preacher: 값이 있을 때만 넣어 기존 값을 빈 값으로 덮지 않는다.
+    if "service_type" in available:
+        service_type = str(data.get("service_type") or "").strip()
+        if service_type:
+            row["service_type"] = service_type
+
+    if "preacher" in available:
+        preacher = str(data.get("preacher") or "").strip()
+        if preacher:
+            row["preacher"] = preacher
 
     sermon_date = normalize_sermon_date(data.get("sermon_date"))
     if sermon_date:
@@ -229,23 +250,28 @@ def is_missing_column_error(response: requests.Response, column: str) -> bool:
     return False
 
 
-def decision_prayer_column_exists() -> bool:
-    """업로드 전 sermons.decision_prayer 컬럼 존재 여부 확인."""
+def column_exists(column: str) -> bool:
+    """업로드 전 sermons.<column> 컬럼 존재 여부 확인."""
     response = requests.get(
         db_url,
         headers={**headers, "Prefer": "return=minimal"},
-        params={"select": "id,decision_prayer", "limit": "1"},
+        params={"select": f"id,{column}", "limit": "1"},
         timeout=30,
     )
     if response.status_code == 200:
         return True
-    if is_missing_column_error(response, "decision_prayer"):
+    if is_missing_column_error(response, column):
         return False
     print(
-        f"[WARN] decision_prayer 컬럼 확인 중 예상치 못한 응답 "
+        f"[WARN] {column} 컬럼 확인 중 예상치 못한 응답 "
         f"({response.status_code}): {response.text[:200]}"
     )
     return False
+
+
+def probe_available_columns() -> set[str]:
+    """존재하는 선택 컬럼만 모은다."""
+    return {col for col in OPTIONAL_COLUMNS if column_exists(col)}
 
 
 def upsert_row(row: dict) -> requests.Response:
@@ -269,22 +295,44 @@ def print_decision_prayer_migration_hint() -> None:
     )
 
 
+def print_service_meta_migration_hint(missing: set[str]) -> None:
+    cols = ", ".join(sorted(missing))
+    print(
+        f"\n[HINT] Supabase에 {cols} 컬럼이 없습니다 (예배 종류/설교자).\n"
+        "  Dashboard → SQL Editor 에서 아래 파일 내용을 실행하세요:\n"
+        f"  {SERVICE_META_MIGRATION_SQL}\n"
+        "  또는 한 줄씩:\n"
+        "  alter table public.sermons add column if not exists service_type text;\n"
+        "  alter table public.sermons add column if not exists preacher text;\n"
+        "  실행 후 python upload_to_db.py 를 다시 돌리면 새벽/청년 메타데이터도 반영됩니다.\n"
+    )
+
+
 def main() -> None:
     if not output_dir.is_dir():
         raise SystemExit(f"[ERROR] output 폴더가 없습니다: {output_dir}")
 
-    include_decision_prayer = decision_prayer_column_exists()
-    if not include_decision_prayer:
+    available = probe_available_columns()
+    missing = set(OPTIONAL_COLUMNS) - available
+
+    if "decision_prayer" in missing:
         print(
             "[WARN] sermons.decision_prayer 컬럼이 DB에 없습니다. "
             "결단의 기도 필드는 제외하고 나머지만 업로드합니다."
         )
         print_decision_prayer_migration_hint()
 
+    service_meta_missing = missing & {"service_type", "preacher"}
+    if service_meta_missing:
+        print(
+            f"[WARN] sermons.{', '.join(sorted(service_meta_missing))} 컬럼이 DB에 없습니다. "
+            "예배 종류/설교자는 제외하고 나머지만 업로드합니다."
+        )
+        print_service_meta_migration_hint(service_meta_missing)
+
     ok_count = 0
     fail_count = 0
-    skipped_prayer_count = 0
-    retried_without_prayer = False
+    skipped_meta_count = 0
 
     for filename in sorted(os.listdir(output_dir)):
         if not filename.endswith(".json"):
@@ -296,56 +344,38 @@ def main() -> None:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        row = build_row(
-            video_id,
-            data,
-            include_decision_prayer=include_decision_prayer,
-        )
+        row = build_row(video_id, data, available=available)
         note_count = len(row["grace_notes"])
-        had_prayer_in_json = normalize_decision_prayer(data.get("decision_prayer")) is not None
 
-        if not include_decision_prayer and had_prayer_in_json:
-            skipped_prayer_count += 1
+        # JSON엔 있으나 DB 컬럼이 없어 빠진 메타데이터 추적
+        json_has_meta = bool(
+            normalize_decision_prayer(data.get("decision_prayer"))
+            or str(data.get("service_type") or "").strip()
+            or str(data.get("preacher") or "").strip()
+        )
+        row_has_meta = any(
+            col in row for col in ("decision_prayer", "service_type", "preacher")
+        )
+        if json_has_meta and not row_has_meta and missing:
+            skipped_meta_count += 1
 
         response = upsert_row(row)
 
         if response.status_code in (200, 201, 204):
             ok_count += 1
-            prayer_note = ""
-            if "decision_prayer" in row:
-                prayer_note = ", decision_prayer: 1"
-            print(f"[OK] {video_id} upsert (grace_notes: {note_count}개{prayer_note})")
+            extras = [c for c in OPTIONAL_COLUMNS if c in row]
+            extra_note = f", {'+'.join(extras)}" if extras else ""
+            print(f"[OK] {video_id} upsert (grace_notes: {note_count}개{extra_note})")
             continue
-
-        if (
-            include_decision_prayer
-            and "decision_prayer" in row
-            and is_missing_column_error(response, "decision_prayer")
-        ):
-            include_decision_prayer = False
-            if not retried_without_prayer:
-                print_decision_prayer_migration_hint()
-            row = build_row(video_id, data, include_decision_prayer=False)
-            if had_prayer_in_json:
-                skipped_prayer_count += 1
-            response = upsert_row(row)
-            retried_without_prayer = True
-            if response.status_code in (200, 201, 204):
-                ok_count += 1
-                print(
-                    f"[OK] {video_id} upsert (grace_notes: {note_count}개, "
-                    "decision_prayer: DB 컬럼 없음 → 제외)"
-                )
-                continue
 
         fail_count += 1
         print(f"[FAIL] {video_id} ({response.status_code}): {response.text}")
 
     print(f"\n완료: 성공 {ok_count}건, 실패 {fail_count}건")
-    if skipped_prayer_count:
+    if skipped_meta_count:
         print(
-            f"  결단의 기도(JSON에 있으나 DB 컬럼 없어 제외): {skipped_prayer_count}건 "
-            "→ SQL 실행 후 upload_to_db.py 재실행"
+            f"  선택 메타데이터(JSON에 있으나 DB 컬럼 없어 제외): {skipped_meta_count}건 "
+            "→ 위 SQL 실행 후 upload_to_db.py 재실행"
         )
 
 

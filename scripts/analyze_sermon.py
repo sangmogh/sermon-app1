@@ -153,6 +153,29 @@ def _sermon_date_prompt_block(expected_sermon_date: str | None) -> str:
         """
 
 
+def _apply_service_metadata(
+    parsed_data: dict,
+    *,
+    service_type: str | None,
+    preacher: str | None,
+) -> dict:
+    """
+    예배 종류(service_type)·설교자(preacher) 확정.
+    - service_type: 소스(재생목록)에서 넘어온 값이 있으면 그것으로 고정 (Gemini 추측 무시).
+    - preacher: 명시적으로 넘어온 값이 있으면 우선, 없으면 Gemini가 추출한 값을 정제(문자열만).
+    """
+    if service_type:
+        parsed_data["service_type"] = service_type
+
+    if preacher and preacher.strip():
+        parsed_data["preacher"] = preacher.strip()
+    else:
+        existing = parsed_data.get("preacher")
+        parsed_data["preacher"] = existing.strip() if isinstance(existing, str) else ""
+
+    return parsed_data
+
+
 def _apply_expected_sermon_date(
     parsed_data: dict, expected_sermon_date: str | None
 ) -> dict:
@@ -824,7 +847,11 @@ def _wait_for_file_active(uploaded_file):
 
 
 def analyze_sermon(
-    transcript_file_name: str, *, expected_sermon_date: str | None = None
+    transcript_file_name: str,
+    *,
+    expected_sermon_date: str | None = None,
+    service_type: str | None = None,
+    preacher: str | None = None,
 ) -> bool:
     """[플랜 A] 자막 텍스트 기반 Gemini 분석."""
     video_id = transcript_file_name.replace("transcript_", "").replace(".txt", "")
@@ -856,6 +883,9 @@ def analyze_sermon(
         )
         parsed_data = _parse_gemini_json(response.text)
         parsed_data = _apply_expected_sermon_date(parsed_data, expected_sermon_date)
+        parsed_data = _apply_service_metadata(
+            parsed_data, service_type=service_type, preacher=preacher
+        )
         parsed_data = _enforce_core_bible_verse(parsed_data)
         parsed_data = _normalize_keywords(parsed_data)
         parsed_data = _enforce_point_timestamps(parsed_data, transcript=transcript)
@@ -874,6 +904,8 @@ def analyze_sermon_from_audio(
     audio_path: str | Path,
     *,
     expected_sermon_date: str | None = None,
+    service_type: str | None = None,
+    preacher: str | None = None,
 ) -> bool:
     """[플랜 B] 오디오 업로드 후 Gemini 멀티모달 분석."""
     audio_path = Path(audio_path)
@@ -899,6 +931,9 @@ def analyze_sermon_from_audio(
         )
         parsed_data = _parse_gemini_json(response.text)
         parsed_data = _apply_expected_sermon_date(parsed_data, expected_sermon_date)
+        parsed_data = _apply_service_metadata(
+            parsed_data, service_type=service_type, preacher=preacher
+        )
         parsed_data = _enforce_core_bible_verse(parsed_data)
         parsed_data = _normalize_keywords(parsed_data)
         parsed_data = _enforce_point_timestamps(parsed_data, transcript=None)

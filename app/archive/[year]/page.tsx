@@ -5,6 +5,7 @@ import {
   filterSermonsByYear,
   sortSermonsBySermonDate,
 } from "@/lib/archive";
+import { isMainSermon } from "@/lib/service-type";
 import { ArchiveMonthList } from "@/components/archive-month-list";
 import { AppShell } from "@/components/app-shell";
 import { PageShell } from "@/components/page-layout";
@@ -37,7 +38,10 @@ export default async function ArchiveYearPage({ params }: ArchiveYearPageProps) 
     throw new Error(`설교 데이터를 불러오지 못했습니다: ${error.message}`);
   }
 
-  const allSermons = (data ?? []) as Sermon[];
+  // 연도별 보기는 주일 설교만 — 새벽·청년은 /archive/dawn, /archive/youth 전용
+  const allSermons = ((data ?? []) as Sermon[]).filter((sermon) =>
+    isMainSermon(sermon.service_type),
+  );
   const availableYears = collectArchiveYears(allSermons);
 
   if (!availableYears.includes(year)) {

@@ -14,7 +14,7 @@ export const revalidate = 3600;
 export default async function HomePage() {
   const { data, error } = await getSupabase()
     .from("sermons")
-    .select("id, title, core_bible_verse, sermon_date")
+    .select("id, title, core_bible_verse, sermon_date, service_type")
     .order("sermon_date", { ascending: false, nullsFirst: false });
 
   if (error) {
