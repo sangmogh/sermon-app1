@@ -313,6 +313,10 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                   <p className="mt-2 inline-flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-medium leading-snug text-rose-700">
                     핵심 포인트- {result.matchedPointTitle}
                   </p>
+                ) : resultMode === "concern" ? (
+                  <p className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold leading-snug text-amber-700">
+                    ⭐ 전체 주제 일치
+                  </p>
                 ) : null}
                 {resultMode !== "concern" && result.keywords.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
