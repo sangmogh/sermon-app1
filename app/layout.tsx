@@ -21,8 +21,31 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sermon-app1-silk.vercel.app"),
   title: "오늘의 말씀",
   description: "말씀으로 하루를 시작하는 설교 앱",
+  openGraph: {
+    type: "website",
+    locale: "ko_KR",
+    url: "https://sermon-app1-silk.vercel.app",
+    siteName: "오늘의 말씀",
+    title: "오늘의 말씀",
+    description: "말씀으로 하루를 시작하는 설교 앱",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "오늘의 말씀",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "오늘의 말씀",
+    description: "말씀으로 하루를 시작하는 설교 앱",
+    images: ["/og-image.png"],
+  },
   appleWebApp: {
     capable: true,
     title: "오늘의 말씀",
