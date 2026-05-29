@@ -47,6 +47,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
 
   const [inputValue, setInputValue] = useState(initialQuery);
   const [results, setResults] = useState<SearchResultSermon[]>([]);
+  const [resultMode, setResultMode] = useState<"concern" | "tag">("concern");
   const [displayQuery, setDisplayQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -68,6 +69,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
     try {
       const data = await searchSermons(trimmed);
       setResults(data);
+      setResultMode("tag");
       setHasSearched(true);
     } catch (error) {
       setResults([]);
@@ -147,6 +149,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
 
         const data = payload as ConcernSearchResponse;
         setResults(data.results);
+        setResultMode("concern");
         setHasSearched(true);
       } catch (error) {
         if (requestId !== concernRequestIdRef.current) {
@@ -308,10 +311,10 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                 </p>
                 {result.matchedPointTitle ? (
                   <p className="mt-2 inline-flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-medium leading-snug text-rose-700">
-                    관련 포인트 · {result.matchedPointTitle}
+                    핵심 포인트- {result.matchedPointTitle}
                   </p>
                 ) : null}
-                {result.keywords.length > 0 ? (
+                {resultMode !== "concern" && result.keywords.length > 0 ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {result.keywords.slice(0, 4).map((keyword, idx) => (
                       <span
