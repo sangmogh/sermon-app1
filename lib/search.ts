@@ -1,6 +1,7 @@
 import { createBrowserSupabase } from "@/lib/supabase-browser";
 import { formatSermonDateLabel, sortSermonsBySermonDate } from "@/lib/archive";
 import { parseKeywords } from "@/lib/sermon-parse";
+import { isMainSermon } from "@/lib/service-type";
 import type { Sermon } from "@/lib/supabase";
 
 export type SearchResultSermon = {
@@ -12,6 +13,8 @@ export type SearchResultSermon = {
   sermon_date?: string | null;
   /** 설교자 이름 — 결과 카드에 'OOO 목사' 라벨로 표시 (있을 때만) */
   preacher?: string | null;
+  /** 예배 종류 — 태그 검색 필터링 전용, UI에 표시하지 않음 */
+  service_type?: string | null;
   /** 고민(임베딩) 검색에서 이 설교를 끌어올린 포인트 제목 (요약 매칭이면 없음) */
   matchedPointTitle?: string;
 };
@@ -19,7 +22,7 @@ export type SearchResultSermon = {
 export const POPULAR_TAGS = ["위로", "결단", "가족", "사명", "믿음"] as const;
 
 const SERMON_SELECT =
-  "id, title, core_bible_verse, keywords, sermon_date, preacher, created_at";
+  "id, title, core_bible_verse, keywords, sermon_date, preacher, service_type, created_at";
 
 /** PostgREST ilike 와일드카드 이스케이프 */
 export function escapeIlikePattern(value: string): string {
@@ -40,6 +43,7 @@ function normalizeRow(row: Record<string, unknown>): SearchResultSermon {
           ? null
           : undefined,
     preacher: typeof row.preacher === "string" ? row.preacher : null,
+    service_type: typeof row.service_type === "string" ? row.service_type : null,
   };
 }
 
@@ -63,7 +67,7 @@ function mergeUniqueResults(
   const map = new Map<string, SearchResultSermon>();
   for (const list of lists) {
     for (const item of list) {
-      if (item.id) {
+      if (item.id && isMainSermon(item.service_type ?? null)) {
         map.set(item.id, item);
       }
     }
