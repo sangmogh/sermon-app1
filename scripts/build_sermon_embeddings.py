@@ -33,8 +33,15 @@ EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001").st
 EMBEDDING_DIM = int((os.getenv("GEMINI_EMBEDDING_DIM") or "768").strip())
 INDEX_PATH = PROJECT_ROOT / "data" / "sermon-embeddings.json"
 BATCH_SIZE = 100
-SLEEP_SEC = 0.3
+SLEEP_SEC = 0.5        # 배치 간 기본 대기 (초)
 DOCUMENT_TASK_TYPE = "RETRIEVAL_DOCUMENT"
+
+# 지수 백오프 설정
+RETRY_MAX = 6          # 최대 재시도 횟수
+RETRY_BASE_SEC = 5     # 첫 대기 초 (5 → 10 → 20 → 40 → 60 → 60)
+RETRY_CAP_SEC = 120    # 최대 대기 초
+# 재시도할 HTTP 상태 코드 (429=Rate Limit, 500·503=서버 오류)
+RETRIABLE_CODES = {429, 500, 503}
 
 
 def _api_key() -> str:
@@ -181,8 +188,27 @@ def _build_units(rows: list[dict]) -> list[dict]:
     return units
 
 
+def _is_resource_exhausted(response: requests.Response) -> bool:
+    """429 또는 응답 본문에 RESOURCE_EXHAUSTED 문자열이 있으면 재시도 대상."""
+    if response.status_code in RETRIABLE_CODES:
+        return True
+    try:
+        body = response.json()
+        # Gemini API는 {"error": {"status": "RESOURCE_EXHAUSTED", ...}} 형태로 반환
+        status = (
+            body.get("error", {}).get("status", "")
+            if isinstance(body, dict)
+            else ""
+        )
+        if "RESOURCE_EXHAUSTED" in status or "RESOURCE_EXHAUSTED" in response.text:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def _embed_batch(texts: list[str], api_key: str) -> list[list[float]]:
-    url = (
+    endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{EMBEDDING_MODEL}:batchEmbedContents?key={api_key}"
     )
@@ -197,15 +223,38 @@ def _embed_batch(texts: list[str], api_key: str) -> list[list[float]]:
             for text in texts
         ]
     }
-    response = requests.post(url, json=body, timeout=120)
-    if response.status_code != 200:
-        raise RuntimeError(f"batchEmbed {response.status_code}: {response.text[:300]}")
+
+    for attempt in range(RETRY_MAX + 1):
+        response = requests.post(endpoint, json=body, timeout=120)
+
+        if response.status_code == 200:
+            break   # 성공
+
+        if attempt < RETRY_MAX and _is_resource_exhausted(response):
+            # Retry-After 헤더가 있으면 그 값을 우선 사용
+            retry_after = response.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                wait = int(retry_after)
+            else:
+                wait = min(RETRY_BASE_SEC * (2 ** attempt), RETRY_CAP_SEC)
+            print(
+                f"  [RETRY {attempt + 1}/{RETRY_MAX}] "
+                f"Resource Exhausted — {wait}초 대기 후 재시도..."
+            )
+            time.sleep(wait)
+            continue
+
+        # 재시도 불가 오류 or 재시도 소진 → 즉시 실패
+        raise RuntimeError(
+            f"batchEmbed {response.status_code} "
+            f"(시도 {attempt + 1}/{RETRY_MAX + 1}): {response.text[:300]}"
+        )
 
     payload = response.json()
     embeddings = payload.get("embeddings") or []
     out: list[list[float]] = []
     for item in embeddings:
-        values = (item.get("values") or item.get("embedding", {}).get("values") or [])
+        values = item.get("values") or item.get("embedding", {}).get("values") or []
         if not values:
             raise RuntimeError("배치 임베딩 응답에 벡터가 없습니다.")
         out.append(values)

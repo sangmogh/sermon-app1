@@ -198,7 +198,16 @@ def _build_json_prompt(
     *,
     from_audio: bool = False,
     expected_sermon_date: str | None = None,
+    full_video: bool = False,
 ) -> str:
+    full_video_note = (
+        "\n    [★ 전체 예배 실황 영상 ★]\n"
+        "    이 영상은 예배 전체 실황입니다. 앞부분의 찬양·기도·성경봉독·예배 안내 등은\n"
+        "    분석 대상에서 제외하고, 실제 설교(말씀 선포) 구간만 요약·포인트·타임스탬프로 다루세요.\n"
+        if full_video
+        else ""
+    )
+
     if from_audio:
         source_note = (
             "다음은 교회 예배 설교의 오디오입니다. 청취하여 내용을 분석해 주세요. "
@@ -246,7 +255,7 @@ def _build_json_prompt(
         transcript_block = f"\n    [설교 스크립트 원문]\n    {transcript}\n"
 
     return f"""
-    {source_note}
+    {source_note}{full_video_note}
     내용을 분석하여 아래의 JSON 형식에 맞춰서 정확하게 출력해 주세요.
     결과물 앞뒤로 다른 설명이나 마크다운(```) 기호는 절대 덧붙이지 말고 순수 JSON만 출력하세요.
 
@@ -852,6 +861,7 @@ def analyze_sermon(
     expected_sermon_date: str | None = None,
     service_type: str | None = None,
     preacher: str | None = None,
+    full_video: bool = False,
 ) -> bool:
     """[플랜 A] 자막 텍스트 기반 Gemini 분석."""
     video_id = transcript_file_name.replace("transcript_", "").replace(".txt", "")
@@ -871,7 +881,7 @@ def analyze_sermon(
         return False
 
     prompt = _build_json_prompt(
-        transcript, expected_sermon_date=expected_sermon_date
+        transcript, expected_sermon_date=expected_sermon_date, full_video=full_video
     )
 
     try:
@@ -906,6 +916,7 @@ def analyze_sermon_from_audio(
     expected_sermon_date: str | None = None,
     service_type: str | None = None,
     preacher: str | None = None,
+    full_video: bool = False,
 ) -> bool:
     """[플랜 B] 오디오 업로드 후 Gemini 멀티모달 분석."""
     audio_path = Path(audio_path)
@@ -921,7 +932,7 @@ def analyze_sermon_from_audio(
         uploaded_file = _wait_for_file_active(uploaded_file)
 
         prompt = _build_json_prompt(
-            from_audio=True, expected_sermon_date=expected_sermon_date
+            from_audio=True, expected_sermon_date=expected_sermon_date, full_video=full_video
         )
         _sleep_before_gemini("플랜 B")
         response = _generate_with_retry(

@@ -30,6 +30,12 @@ SOURCES: dict[str, dict] = {
         "service_type": "새벽",
         "full_video": False,
     },
+    "youth": {
+        "playlist_url": "https://www.youtube.com/playlist?list=PLGpyTA6CZTZ0TyMnb8qKjNN-HUzOw5b85",
+        "service_type": "청년",
+        # 풀영상 — 찬양·기도·봉독 포함. Gemini가 설교 구간을 알아서 찾음.
+        "full_video": True,
+    },
 }
 
 

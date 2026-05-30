@@ -112,10 +112,12 @@ def process_single_video(
     youtube_title: str | None = None,
     service_type: str | None = None,
     preacher: str | None = None,
+    full_video: bool = False,
 ) -> tuple[bool, bool]:
     """
     한 영상 처리. (성공 여부, 이미 분석됨 스킵 여부) 반환. 내부 예외는 모두 처리.
     service_type/preacher 는 소스(재생목록)에서 넘어와 JSON에 그대로 기록된다.
+    full_video=True 면 찬양·봉독 등 예배 전반부 제외 힌트를 Gemini 프롬프트에 추가.
     """
     print(f"\n▶️ [{index}/{total}] 처리 시작: {video_id}")
 
@@ -141,6 +143,7 @@ def process_single_video(
                 expected_sermon_date=expected_date,
                 service_type=service_type,
                 preacher=resolved_preacher,
+                full_video=full_video,
             ):
                 if validate_saved_json(video_id):
                     print(f"✅ [{index}/{total}] 플랜 A 완료: {video_id}")
@@ -172,6 +175,7 @@ def process_single_video(
                 expected_sermon_date=expected_date,
                 service_type=service_type,
                 preacher=resolved_preacher,
+                full_video=full_video,
             ):
                 print(f"❌ [{index}/{total}] 플랜 B 분석 실패: {video_id}")
                 return False, False
@@ -204,9 +208,12 @@ def process_playlist(
     limit: int | None = None,
     service_type: str | None = None,
     preacher: str | None = None,
+    full_video: bool = False,
 ) -> None:
     if service_type:
         print(f"🏷️ 예배 종류(service_type) = {service_type}")
+    if full_video:
+        print("🎬 풀영상 모드 — Gemini가 설교 구간을 직접 찾습니다")
     print("👀 재생목록 정보를 가져오는 중입니다...")
 
     ydl_opts = merge_ytdlp_auth_opts(
@@ -251,6 +258,7 @@ def process_playlist(
                 youtube_title=title,
                 service_type=service_type,
                 preacher=preacher,
+                full_video=full_video,
             )
             if ok:
                 success_count += 1
