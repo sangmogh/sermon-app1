@@ -10,6 +10,7 @@ import {
   searchSermons,
   type SearchResultSermon,
 } from "@/lib/search";
+import { isMainSermon } from "@/lib/service-type";
 import type { KeywordStat } from "@/lib/keyword-stats";
 
 type SearchClientProps = {
@@ -320,7 +321,7 @@ export function SearchClient({ topKeywords }: SearchClientProps) {
                   <p className="mt-2 inline-flex items-start gap-1 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-medium leading-snug text-rose-700">
                     핵심 포인트- {result.matchedPointTitle}
                   </p>
-                ) : resultMode === "concern" ? (
+                ) : resultMode === "concern" && isMainSermon(result.service_type) ? (
                   <p className="mt-2 inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-medium leading-snug text-amber-700">
                     주제와 유사
                   </p>
