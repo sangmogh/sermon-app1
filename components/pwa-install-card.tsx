@@ -6,7 +6,6 @@ import {
   buildAndroidChromeIntentUrl,
   copyPageUrl,
   isAndroid,
-  isChromeBrowser,
   isInAppBrowser,
   isIOS,
   isSafariBrowser,
@@ -49,14 +48,20 @@ function detectInstallMode(): InstallMode {
   }
 
   const ua = navigator.userAgent;
+  // 인앱 브라우저(카카오·네이버앱 등)는 PWA 설치가 막혀 있어 외부 브라우저로 유도.
   if (isInAppBrowser(ua)) {
     return "open-external";
   }
+  // iOS는 Safari만 홈 화면 추가 가능. 그 외(iOS Chrome 등)는 Safari로 유도.
   if (isIOS(ua)) {
     return isSafariBrowser(ua) ? "install-ready" : "open-external";
   }
+  // 안드로이드 일반 브라우저(Chrome·삼성·Edge·Opera·웨일·Firefox 등)는 모두 설치 시도.
+  // 설치 가능 브라우저는 beforeinstallprompt 가 떠서 deferredPrompt 로 바로 설치되고,
+  // 미지원(Firefox 등)은 클릭 시 수동 안내 힌트로 안전하게 떨어진다.
+  // → Chrome Intent 강제 이동을 제거해 삼성 인터넷 무한루프를 근본 차단.
   if (isAndroid(ua)) {
-    return isChromeBrowser(ua) ? "install-ready" : "open-external";
+    return "install-ready";
   }
   return "install-hint";
 }
@@ -66,7 +71,7 @@ function getInstallHint(platform: DevicePlatform): string {
     return "하단 공유(□↑) → 「홈 화면에 추가」 → 「추가」";
   }
   if (platform === "android") {
-    return "설치 창이 안 뜨면 Chrome 메뉴(⋮) → 「앱 설치」를 눌러주세요.";
+    return "설치 창이 안 뜨면 브라우저 메뉴(⋮)에서 「앱 설치」 또는 「홈 화면에 추가」를 눌러주세요.";
   }
   return "휴대폰 Chrome 또는 Safari에서 열어주세요.";
 }
